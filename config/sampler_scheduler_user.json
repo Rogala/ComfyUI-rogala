@@ -1,0 +1,12 @@
+{
+    "samplers": [
+        "euler",
+        "gradient_estimation"
+    ],
+    "schedulers": [
+        "simple",
+        "sgm_uniform",
+        "bong_tangent",
+        "beta57"
+    ]
+}
