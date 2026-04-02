@@ -65,7 +65,7 @@ Supports `%NodeTitle.param%` template tags resolved from the active ComfyUI prom
 
 | Pin | Type | Description |
 |---|---|---|
-| `image` | IMAGE | Input image with text block composited on top. |
+| `image` | IMAGE | Outputs an image with a text block superimposed on top. |
 
 ### Example
 
@@ -119,7 +119,7 @@ class AlignedTextOverlay:
     Outputs
     -------
     image : IMAGE
-        Input image with text overlay composited on top.
+        Outputs an image with a text block superimposed on top.
     """
 
     # ------------------------------------------------------------------
