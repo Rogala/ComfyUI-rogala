@@ -31,6 +31,8 @@ ComfyUI-rogala/
 Renders a **multi-line text block** onto an image at a chosen corner before saving.
 Supports `%NodeTitle.param%` template tags resolved from the active ComfyUI prompt.
 
+<img width="1726" height="538" alt="Aligned Text Overlay" src="https://github.com/user-attachments/assets/45d9ef57-4073-4978-a7a7-e4069bd3312d" />
+
 ---
 
 ### Inputs
@@ -80,6 +82,8 @@ Queue stops automatically after the last combination.
 > samplers and schedulers from ComfyUI and writes the reference file.
 > The counter resets to 0.
 
+<img width="1754" height="462" alt="Sampler Scheduler Iterator" src="https://github.com/user-attachments/assets/e13921a4-2fa9-41b5-86d7-9cfaac4d10ff" />
+
 ---
 
 ### Inputs
@@ -115,6 +119,8 @@ Unknown names are silently ignored.
 
 Selects the correct **input resolution** and **frame count** for LTX Video models.
 Supports Dev mode and Distilled upscale modes (x1.5 and x2).
+
+<img width="2049" height="667" alt="LTX Resolution Selector" src="https://github.com/user-attachments/assets/2c356de9-4a04-461f-93f3-cfb043ae902e" />
 
 ---
 
