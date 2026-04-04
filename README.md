@@ -166,7 +166,9 @@ To render a 5-second clip at 1920x1080 using x2 Distilled:
 A lightweight frontend extension that adds a persistent toolbar at the bottom of the canvas
 for aligning, distributing, and resizing selected nodes.
 
-<!-- gif placeholder -->
+https://github.com/user-attachments/assets/41b3f0fd-5d46-4fb2-84f3-9a3815f6dbe2
+
+
 
 **Features:** align left / right / top / bottom · distribute horizontally and vertically
 (gap-aware, not center-based) · match width to widest node (aligns to leftmost) · deselect all
