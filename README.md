@@ -158,3 +158,23 @@ To render a 5-second clip at 1920x1080 using x2 Distilled:
 - `upscale_target` = `1920x1080 (Landscape)`
 - `fps` = 24, `duration_sec` = 5
 - Node outputs: `width=960, height=544, length=121, fps=24`
+
+---
+
+## Script for Aligning Nodes
+
+A lightweight frontend extension that adds a persistent toolbar at the bottom of the canvas
+for aligning, distributing, and resizing selected nodes.
+
+<!-- gif placeholder -->
+
+**Features:** align left / right / top / bottom · distribute horizontally and vertically
+(gap-aware, not center-based) · match width to widest node (aligns to leftmost) · deselect all
+
+The toolbar auto-scales based on screen resolution (1080p / 2K / 4K) and includes manual
+size control (5 levels, −2 to +2) so the buttons stay comfortable at any display density.
+Localized tooltips in EN / DE / FR / ZH / ES / IT / UA.
+
+> Independent implementation inspired by [KayTool](https://github.com/kk8bit/kaytool)
+> (kk8bit) and [ComfyUI-NodeAligner](https://github.com/Tenney95/ComfyUI-NodeAligner)
+> (Tenney95). No shared code — similar idea, different approach.
