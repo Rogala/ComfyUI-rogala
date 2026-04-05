@@ -6,7 +6,7 @@ Custom node pack for ComfyUI by rogala.
 All nodes follow a unified structure:
 - Category  : rogala/<subcategory>
 - Node name : PascalCase, no prefix (e.g. SamplerSchedulerIterator)
-- Display   : "Readable Name [rogala]"
+- Display   : "Readable Name"
 - Docs      : English only, DESCRIPTION field + doc_popup.js
 - Menu      : Single top-level entry "rogala"
 """
@@ -14,24 +14,27 @@ All nodes follow a unified structure:
 # ---------------------------------------------------------------------------
 # Node imports
 # ---------------------------------------------------------------------------
-from .nodes.sampler_scheduler_iterator import NODE_CLASS_MAPPINGS as _SAMPLER_NODES
-from .nodes.sampler_scheduler_iterator import refresh_config
-from .nodes.aligned_text_overlay       import NODE_CLASS_MAPPINGS as _TEXT_NODES
-from .nodes.ltx_resolution_selector    import NODE_CLASS_MAPPINGS as _VIDEO_NODES
+from .nodes.sampler_scheduler_iterator  import NODE_CLASS_MAPPINGS as _SAMPLER_NODES
+from .nodes.sampler_scheduler_iterator  import refresh_config
+from .nodes.aligned_text_overlay_images import NODE_CLASS_MAPPINGS as _IMAGE_NODES
+from .nodes.aligned_text_overlay_video  import NODE_CLASS_MAPPINGS as _VIDEO_NODES
+from .nodes.ltx_resolution_selector     import NODE_CLASS_MAPPINGS as _LTX_NODES
 
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 NODE_CLASS_MAPPINGS: dict = {
     **_SAMPLER_NODES,
-    **_TEXT_NODES,
+    **_IMAGE_NODES,
     **_VIDEO_NODES,
+    **_LTX_NODES,
 }
 
 NODE_DISPLAY_NAMES: dict = {
-    "SamplerSchedulerIterator": "Sampler Scheduler Iterator [rogala]",
-    "AlignedTextOverlay":       "Aligned Text Overlay [rogala]",
-    "LtxResolutionSelector":    "LTX Resolution Selector [rogala]",
+    "SamplerSchedulerIterator":  "Sampler Scheduler Iterator",
+    "AlignedTextOverlayImages":  "Aligned Text Overlay Images",
+    "AlignedTextOverlayVideo":   "Aligned Text Overlay Video",
+    "LtxResolutionSelector":     "LTX Resolution Selector",
 }
 
 # ---------------------------------------------------------------------------

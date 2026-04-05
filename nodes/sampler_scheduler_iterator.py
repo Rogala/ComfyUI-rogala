@@ -14,7 +14,7 @@ Pressing the Refresh button on the node:
 User customisation is done via config/sampler_scheduler_user.json.
 
 Category : rogala/Samplers
-Version  : 1.4.0
+Version  : 2.0.0
 """
 
 # ---------------------------------------------------------------------------

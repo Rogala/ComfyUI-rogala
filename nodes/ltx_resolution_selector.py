@@ -9,8 +9,13 @@ Supports three modes:
   - x2  Distilled    : input size that yields the target after x2  upscale
 
 Category : rogala/Video
-Version  : 1.0.0
+Version  : 2.0.0
 """
+
+# ---------------------------------------------------------------------------
+# Imports
+# ---------------------------------------------------------------------------
+
 
 # ---------------------------------------------------------------------------
 # Constants

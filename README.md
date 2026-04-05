@@ -26,12 +26,12 @@ ComfyUI-rogala/
 ```
 ---
 
-## Aligned Text Overlay
+## Aligned Text Overlay Images
 
 Renders a **multi-line text block** onto an image at a chosen corner before saving.
 Supports `%NodeTitle.param%` template tags resolved from the active ComfyUI prompt.
 
-<img width="1726" height="538" alt="Aligned Text Overlay" src="https://github.com/user-attachments/assets/45d9ef57-4073-4978-a7a7-e4069bd3312d" />
+<img width="1726" height="538" alt="Aligned Text Overlay Images" src="https://github.com/user-attachments/assets/45d9ef57-4073-4978-a7a7-e4069bd3312d" />
 
 ---
 
@@ -71,10 +71,64 @@ the current `"sampler | scheduler"` pair to the overlay.
 
 ---
 
+## Aligned Text Overlay Video
+
+Renders a **multi-line text block** onto **every frame of a video tensor**.
+Supports `%NodeTitle.param%` template tags resolved from the active ComfyUI prompt.
+
+---
+
+### Inputs
+
+| Pin | Default | Description |
+|---|---|---|
+| `images` | — | Video tensor (B, H, W, C). |
+| `text_template` | see default | Template string with optional `%NodeTitle.param%` tags. |
+| `vertical` | bottom | Vertical anchor: `top` or `bottom`. |
+| `horizontal` | right | Horizontal anchor: `left` or `right`. |
+| `font_size` | 16 | Font size in points (10–50). |
+| `text_color` | white | Text colour. |
+| `bg_color` | black | Background colour (`none` = transparent). |
+| `bg_opacity` | 150 | Background opacity (50–250). |
+| `first_frame_only` | false | Apply overlay only to the first frame (fast preview). |
+| `external_text` | — | Optional string appended after the resolved template. |
+
+### Outputs
+
+| Pin | Type | Description |
+|---|---|---|
+| `images` | IMAGE | Outputs a video tensor with text overlay applied. |
+
+### Example
+
+Connect between VAE Decode and video output:
+
+VAE Decode -> AlignedTextOverlayVideo -> VHS Video Combine
+
+Default template pulls values directly from a KSampler node:
+
+seed: %KSampler.seed% | steps: %KSampler.steps%
+cfg: %KSampler.cfg% | %KSampler.sampler_name% | %KSampler.scheduler%
+
+If you have multiple samplers, rename them in the graph (Right Click → Title)
+and reference explicitly:
+
+steps: %Sampler_1.steps%
+
+NodeTitle must match the title shown on the node in the graph.
+Numeric sampler / scheduler indices are decoded to names automatically.
+
+Connect external_text from SamplerSchedulerIterator to append
+the current "sampler | scheduler" pair to the overlay.
+
+Enable first_frame_only for fast preview (applies overlay only to frame 0).
+
+---
+
 ## Sampler Scheduler Iterator
 
 Iterates over **sampler x scheduler** combinations one pair per execution.
-Outputs each pair to connected nodes (e.g. KSampler, Aligned Text Overlay).
+Outputs each pair to connected nodes (e.g. KSampler, Aligned Text Overlay Images).
 Node title updates automatically: `Iterator: Step 3 / 12`.
 Queue stops automatically after the last combination.
 
