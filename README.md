@@ -76,6 +76,8 @@ the current `"sampler | scheduler"` pair to the overlay.
 Renders a **multi-line text block** onto **every frame of a video tensor**.
 Supports `%NodeTitle.param%` template tags resolved from the active ComfyUI prompt.
 
+<img width="1829" height="669" alt="aligned_text_overlay_video" src="https://github.com/user-attachments/assets/33243112-db49-4b38-a561-e1f878eda56b" />
+
 ---
 
 ### Inputs
