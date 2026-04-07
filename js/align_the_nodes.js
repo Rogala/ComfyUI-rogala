@@ -78,7 +78,7 @@ app.registerExtension({
         scaleDown:   "Riduci",
         scaleUp:     "Ingrandisci",
     },
-    "pt-BR": {
+    pt: {
         alignLeft:   "Alinhar à esquerda",
         alignRight:  "Alinhar à direita",
         alignTop:    "Alinhar ao topo",
