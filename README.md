@@ -229,7 +229,7 @@ for aligning, distributing, and resizing selected nodes.
 
 The toolbar auto-scales based on screen resolution (1080p / 2K / 4K) and includes manual
 size control (5 levels, −2 to +2) so the buttons stay comfortable at any display density.
-Localized tooltips in EN / DE / FR / ZH / ES / IT / UA.
+Localized tooltips (EN, UK-UA, DE, FR, ES, IT, PT-BR, ZH, JA)
 
 > Independent implementation inspired by [KayTool](https://github.com/kk8bit/kaytool)
 > (kk8bit) and [ComfyUI-NodeAligner](https://github.com/Tenney95/ComfyUI-NodeAligner)
