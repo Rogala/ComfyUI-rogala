@@ -192,8 +192,8 @@ class AlignedTextOverlayVideo:
                     {
                         "default": 150,
                         "min": 50,
-                        "max": 250,
-                        "tooltip": "Background rectangle opacity (alpha value).",
+                        "max": 255,
+                        "tooltip": "Background rectangle opacity (alpha value, 50–255).",
                     },
                 ),
                 "first_frame_only": (
@@ -239,7 +239,7 @@ class AlignedTextOverlayVideo:
         first_frame_only: bool = False,
         prompt=None,
         extra_pnginfo=None,
-        external_text: str = "",
+        external_text=None,
     ) -> tuple:
         """
         Resolve template tags, composite the text onto every video frame,
@@ -279,7 +279,7 @@ class AlignedTextOverlayVideo:
         """
         result_text = _resolve_template(text_template, prompt, extra_pnginfo)
 
-        if external_text:
+        if external_text:  # handles None and empty string
             sep = "" if (not result_text or result_text[-1] in (" ", "\n")) else " "
             result_text = f"{result_text}{sep}{external_text}"
 

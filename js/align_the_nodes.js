@@ -4,7 +4,7 @@ app.registerExtension({
     name: "My.OrderTool.BottomStationary",
     async setup() {
 
-        // ─── Localization (UI tooltips only) ──────────────────────
+        // ─── Localization (UI tooltips only) — 9 languages: en, uk, de, fr, es, it, pt, zh, ja ──
         const LOCALES = {
     en: {
         alignLeft:   "Align Left",
@@ -371,7 +371,7 @@ app.registerExtension({
             scaleIndicator.style.color = level === 0 ? "#666" : "#ff9000";
         };
 
-        // Note: − and + buttons are NOT added to allBtns — they keep fixed size
+        // Note: − and + buttons ARE added to allBtns — they scale together with action buttons
         const btnMinus = document.createElement("button");
         btnMinus.innerText = "−";
         btnMinus.style.cssText = `

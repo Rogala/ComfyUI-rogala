@@ -17,6 +17,8 @@ Restart ComfyUI. All nodes appear under the **rogala** menu.
 ComfyUI-rogala/
 ├── __init__.py          # Entry point — registers all nodes
 ├── pyproject.toml       # Package metadata
+├── fonts/               # Fonts used by text overlay nodes
+│   └── *.ttf            # Place any TTF font file here
 ├── nodes/               # One .py file per node (or logical group)
 │   └── _template.py     # Copy this to create a new node
 ├── js/                  # Frontend extensions loaded by ComfyUI
@@ -24,6 +26,246 @@ ComfyUI-rogala/
 │   └── categories.json  # Category definitions
 └── web/                 # Static web assets (CSS, icons) if needed
 ```
+---
+
+## Script for Aligning Nodes
+
+A lightweight frontend extension that adds a persistent toolbar at the bottom of the canvas
+for aligning, distributing, and resizing selected nodes.
+
+![Capture](https://github.com/user-attachments/assets/d44a254b-6e57-4bf7-8aa3-e46cc6bc0ffa)
+
+**Features:** align left / right / top / bottom · distribute horizontally and vertically
+(gap-aware, not center-based) · match width to widest node (aligns to leftmost) · deselect all
+
+The toolbar auto-scales based on screen resolution (1080p / 2K / 4K) and includes manual
+size control (5 levels, −2 to +2) so the buttons stay comfortable at any display density.
+Localized tooltips (EN, UK-UA, DE, FR, ES, IT, PT-BR, ZH, JA)
+
+> Independent implementation inspired by [KayTool](https://github.com/kk8bit/kaytool)
+> (kk8bit) and [ComfyUI-NodeAligner](https://github.com/Tenney95/ComfyUI-NodeAligner)
+> (Tenney95). No shared code — similar idea, different approach.
+
+---
+
+## LTX Video 2.3 — FMLFLTX + SamplerLTXV
+
+A two-node pipeline for LTX Video 2.3 distilled models with spatial upscaling.
+**FMLFLTX_2.3** prepares the latent space from up to 6 guide images.
+**SamplerLTXV_2.3** runs a two-pass denoise — low resolution first, then upscale and refinement.
+
+Inspired by the workflows of [WhatDreamsCost](https://github.com/WhatDreamsCost/WhatDreamsCost-ComfyUI)
+and [princepainter](https://github.com/princepainter/ComfyUI-PainterLTXV2).
+
+---
+
+### FMLFLTX_2.3
+
+Loads up to 6 guide images and distributes them evenly across the video timeline.
+Outputs video and audio latents ready for **SamplerLTXV_2.3**.
+
+#### Inputs
+
+| Pin | Default | Description |
+|---|---|---|
+| `video_vae` | — | Video VAE for image encoding. |
+| `audio_vae` | — | Audio VAE for empty audio latent creation. |
+| `img_compression` | 18 | JPEG pre-compression strength (0 = disabled). |
+| `width` | 768 | Latent width — connect from **LTX Resolution Selector**. |
+| `height` | 512 | Latent height — connect from **LTX Resolution Selector**. |
+| `length` | 97 | Frame count — connect from **LTX Resolution Selector**. |
+| `fps` | 25.0 | Frames per second — connect from **LTX Resolution Selector**. |
+| `batch_size` | 1 | Batch size. |
+| `image_1 … image_6` | — | Guide images (optional). Connect only the slots you need. |
+| `strength_1 … strength_6` | 1.0 | Conditioning strength per image (1.0 = fully conditioned). |
+
+#### Frame placement
+
+Images are placed at evenly-spaced positions across the full video duration:
+
+| Images connected | Placement |
+|---|---|
+| 1 | frame 0 |
+| 2 | 0%, 50% |
+| 3 | 0%, 33%, 66% |
+| 4 | 0%, 25%, 50%, 75% |
+| 5 | 0%, 20%, 40%, 60%, 80% |
+| 6 | 0%, 17%, 33%, 50%, 67%, 83% |
+
+Recommended number of images by video duration (targeting ~8 sec per image):
+
+| Duration | Images | Interval |
+|---|---|---|
+| 10–15 sec | 2 | ~7 sec |
+| 20–25 sec | 3 | ~8 sec |
+| 30–35 sec | 4 | ~8 sec |
+| 40–50 sec | 5–6 | ~8 sec |
+| 50–60 sec | 6 | ~8–10 sec |
+
+#### Outputs
+
+| Pin | Description |
+|---|---|
+| `latent` | Combined video + audio NestedTensor (legacy). |
+| `video_latent` | Video latent → connect to **SamplerLTXV_2.3** `video_latent`. |
+| `audio_latent` | Empty audio latent → connect to **SamplerLTXV_2.3** `audio_latent`. |
+
+---
+
+<!-- place workflow screenshot here -->
+
+---
+
+### SamplerLTXV_2.3
+
+Two-pass sampler for LTX Video 2.3 distilled models.
+
+**Pass 1** — full denoise at the input resolution (video + audio NestedTensor).  
+**Pass 2** — spatial upscale, re-embed first/last frames at upscaled resolution, refinement denoise.
+
+#### Inputs
+
+| Pin | Description |
+|---|---|
+| `model` | Diffusion model. |
+| `video_vae` | Video VAE — used for image encoding and upscale statistics. |
+| `positive` | Positive conditioning. |
+| `negative` | Negative conditioning. |
+| `video_latent` | Connect from **FMLFLTX_2.3** `video_latent`. |
+| `audio_latent` | Connect from **FMLFLTX_2.3** `audio_latent`. |
+| `start_image` | First frame re-embedded after upscale (optional). |
+| `end_image` | Last frame re-embedded after upscale (optional). |
+| `upscale_model` | Latent upscale model for pass 2 (optional). |
+
+**Pass 1 parameters**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `add_noise_1` | enable | Add noise before pass 1. |
+| `noise_seed_1` | 0 | Noise seed for pass 1. |
+| `steps_1` | 8 | Denoising steps for pass 1. |
+| `cfg_1` | 1.0 | CFG scale for pass 1. |
+| `sampler_name_1` | euler | Sampler for pass 1. |
+| `scheduler_1` | linear_quadratic | Scheduler for pass 1. |
+| `denoise_1` | 1.0 | Denoise strength for pass 1. |
+
+**Pass 2 parameters**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `add_noise_2` | enable | Add noise before pass 2. |
+| `noise_seed_2` | 0 | Noise seed for pass 2. |
+| `steps_2` | 3 | Denoising steps for pass 2 (refinement). |
+| `cfg_2` | 1.0 | CFG scale for pass 2. |
+| `sampler_name_2` | euler | Sampler for pass 2. |
+| `scheduler_2` | linear_quadratic | Scheduler for pass 2. |
+| `denoise_2` | 0.4 | Denoise strength for pass 2 — lower = less change to upscaled latent. |
+
+#### Outputs
+
+| Pin | Description |
+|---|---|
+| `video_latent` | Upscaled and refined video latent → connect to VAE Decode. |
+| `audio_latent` | Audio latent from pass 1 → connect to LTXV Audio VAE Decode. |
+
+#### Recommended settings
+
+| Resolution target | steps_1 | steps_2 | denoise_2 |
+|---|---|---|---|
+| up to 960×544 | 8 | 3–4 | 0.4 |
+| 1280×720 | 8–12 | 4–6 | 0.4 |
+| 1920×1080 | 12 | 6 | 0.4 |
+
+---
+
+## LTX Resolution Selector
+
+Selects the correct **input resolution** and **frame count** for LTX Video models.
+Supports Dev mode and Distilled upscale modes (x1.5 and x2).
+
+<img width="2049" height="667" alt="LTX Resolution Selector" src="https://github.com/user-attachments/assets/2c356de9-4a04-461f-93f3-cfb043ae902e" />
+
+---
+
+### Inputs
+
+| Pin | Default | Description |
+|---|---|---|
+| `mode` | Dev (no upscale) | Render mode — see table below. |
+| `dev_target` | 960x544 | Target resolution for Dev mode (12 options). |
+| `upscale_target` | 1920x1080 | Target resolution for Distilled modes (6 options). |
+| `fps` | 24.0 | Frames per second (1–120). Passed through to output. |
+| `duration_sec` | 5 | Clip duration in seconds (1–300). |
+
+**mode options:**
+
+| Value | Description |
+|---|---|
+| `Dev (no upscale)` | Standard LTX Dev sizes, rounded UP to nearest multiple of 32. |
+| `x1.5 Distilled` | Returns input size needed to reach the target after x1.5 upscale. |
+| `x2 Distilled` | Returns input size needed to reach the target after x2 upscale. |
+
+### Outputs
+
+| Pin | Type | Description |
+|---|---|---|
+| `width` | INT | Input width in pixels (multiple of 32). |
+| `height` | INT | Input height in pixels (multiple of 32). |
+| `length` | INT | Frame count: `1 + 8 x round(fps x sec / 8)`. |
+| `fps` | FLOAT | Passthrough of the fps input. |
+
+### Example
+
+To render a 5-second clip at 1920x1080 using x2 Distilled:
+- `mode` = `x2 Distilled`
+- `upscale_target` = `1920x1080 (Landscape)`
+- `fps` = 24, `duration_sec` = 5
+- Node outputs: `width=960, height=544, length=121, fps=24`
+
+---
+
+## Sampler Scheduler Iterator
+
+Iterates over **sampler x scheduler** combinations one pair per execution.
+Outputs each pair to connected nodes (e.g. KSampler, Aligned Text Overlay Images).
+Node title updates automatically: `Iterator: Step 3 / 12`.
+Queue stops automatically after the last combination.
+
+> **Note:** Press **Refresh** before first use. This reads all installed
+> samplers and schedulers from ComfyUI and writes the reference file.
+> The counter resets to 0.
+
+<img width="1754" height="462" alt="Sampler Scheduler Iterator" src="https://github.com/user-attachments/assets/e13921a4-2fa9-41b5-86d7-9cfaac4d10ff" />
+
+---
+
+### Inputs
+
+This node has no inputs. Configure combinations in `.\ComfyUI\custom_nodes\ComfyUI-rogala\config\sampler_scheduler_user.json`.
+
+### Outputs
+
+| Pin | Type | Description |
+|---|---|---|
+| `sampler_name` | SAMPLER | Current sampler — connect to KSampler. |
+| `scheduler` | SCHEDULER | Current scheduler — connect to KSampler. |
+| `external_text` | STRING | `"sampler | scheduler"` label — connect to Aligned Text Overlay. |
+
+### Example
+
+Edit `config/sampler_scheduler_user.json` to select combinations:
+
+```json
+{
+    "samplers": ["euler", "dpmpp_2m", "dpmpp_3m_sde"],
+    "schedulers": ["karras", "simple"]
+}
+```
+
+Total = samplers x schedulers (here: 3 x 2 = **6 runs**).
+Copy names from `config/sampler_scheduler.json` (generated by Refresh).
+Unknown names are silently ignored.
+
 ---
 
 ## Aligned Text Overlay Images
@@ -105,132 +347,28 @@ Supports `%NodeTitle.param%` template tags resolved from the active ComfyUI prom
 
 Connect between VAE Decode and video output:
 
-VAE Decode -> AlignedTextOverlayVideo -> VHS Video Combine
+```
+VAE Decode → AlignedTextOverlayVideo → VHS Video Combine
+```
 
 Default template pulls values directly from a KSampler node:
 
+```
 seed: %KSampler.seed% | steps: %KSampler.steps%
 cfg: %KSampler.cfg% | %KSampler.sampler_name% | %KSampler.scheduler%
+```
 
 If you have multiple samplers, rename them in the graph (Right Click → Title)
 and reference explicitly:
 
+```
 steps: %Sampler_1.steps%
-
-NodeTitle must match the title shown on the node in the graph.
-Numeric sampler / scheduler indices are decoded to names automatically.
-
-Connect external_text from SamplerSchedulerIterator to append
-the current "sampler | scheduler" pair to the overlay.
-
-Enable first_frame_only for fast preview (applies overlay only to frame 0).
-
----
-
-## Sampler Scheduler Iterator
-
-Iterates over **sampler x scheduler** combinations one pair per execution.
-Outputs each pair to connected nodes (e.g. KSampler, Aligned Text Overlay Images).
-Node title updates automatically: `Iterator: Step 3 / 12`.
-Queue stops automatically after the last combination.
-
-> **Note:** Press **Refresh** before first use. This reads all installed
-> samplers and schedulers from ComfyUI and writes the reference file.
-> The counter resets to 0.
-
-<img width="1754" height="462" alt="Sampler Scheduler Iterator" src="https://github.com/user-attachments/assets/e13921a4-2fa9-41b5-86d7-9cfaac4d10ff" />
-
----
-
-### Inputs
-
-This node has no inputs. Configure combinations in `.\ComfyUI\custom_nodes\ComfyUI-rogala\config\sampler_scheduler_user.json`.
-
-### Outputs
-
-| Pin | Type | Description |
-|---|---|---|
-| `sampler_name` | SAMPLER | Current sampler — connect to KSampler. |
-| `scheduler` | SCHEDULER | Current scheduler — connect to KSampler. |
-| `external_text` | STRING | `"sampler | scheduler"` label — connect to Aligned Text Overlay. |
-
-### Example
-
-Edit `config/sampler_scheduler_user.json` to select combinations:
-
-```json
-{
-    "samplers": ["euler", "dpmpp_2m", "dpmpp_3m_sde"],
-    "schedulers": ["karras", "simple"]
-}
 ```
 
-Total = samplers x schedulers (here: 3 x 2 = **6 runs**).
-Copy names from `config/sampler_scheduler.json` (generated by Refresh).
-Unknown names are silently ignored.
+`NodeTitle` must match the title shown on the node in the graph.
+Numeric sampler / scheduler indices are decoded to names automatically.
 
----
+Connect `external_text` from **SamplerSchedulerIterator** to append
+the current `"sampler | scheduler"` pair to the overlay.
 
-## LTX Resolution Selector
-
-Selects the correct **input resolution** and **frame count** for LTX Video models.
-Supports Dev mode and Distilled upscale modes (x1.5 and x2).
-
-<img width="2049" height="667" alt="LTX Resolution Selector" src="https://github.com/user-attachments/assets/2c356de9-4a04-461f-93f3-cfb043ae902e" />
-
----
-
-### Inputs
-
-| Pin | Default | Description |
-|---|---|---|
-| `mode` | Dev (no upscale) | Render mode — see table below. |
-| `dev_target` | 960x544 | Target resolution for Dev mode (12 options). |
-| `upscale_target` | 1920x1080 | Target resolution for Distilled modes (6 options). |
-| `fps` | 24.0 | Frames per second (1–120). Passed through to output. |
-| `duration_sec` | 5 | Clip duration in seconds (1–300). |
-
-**mode options:**
-
-| Value | Description |
-|---|---|
-| `Dev (no upscale)` | Standard LTX Dev sizes, rounded UP to nearest multiple of 32. |
-| `x1.5 Distilled` | Returns input size needed to reach the target after x1.5 upscale. |
-| `x2 Distilled` | Returns input size needed to reach the target after x2 upscale. |
-
-### Outputs
-
-| Pin | Type | Description |
-|---|---|---|
-| `width` | INT | Input width in pixels (multiple of 32). |
-| `height` | INT | Input height in pixels (multiple of 32). |
-| `length` | INT | Frame count: `1 + 8 x round(fps x sec / 8)`. |
-| `fps` | FLOAT | Passthrough of the fps input. |
-
-### Example
-
-To render a 5-second clip at 1920x1080 using x2 Distilled:
-- `mode` = `x2 Distilled`
-- `upscale_target` = `1920x1080 (Landscape)`
-- `fps` = 24, `duration_sec` = 5
-- Node outputs: `width=960, height=544, length=121, fps=24`
-
----
-
-## Script for Aligning Nodes
-
-A lightweight frontend extension that adds a persistent toolbar at the bottom of the canvas
-for aligning, distributing, and resizing selected nodes.
-
-![Capture](https://github.com/user-attachments/assets/d44a254b-6e57-4bf7-8aa3-e46cc6bc0ffa)
-
-**Features:** align left / right / top / bottom · distribute horizontally and vertically
-(gap-aware, not center-based) · match width to widest node (aligns to leftmost) · deselect all
-
-The toolbar auto-scales based on screen resolution (1080p / 2K / 4K) and includes manual
-size control (5 levels, −2 to +2) so the buttons stay comfortable at any display density.
-Localized tooltips (EN, UK-UA, DE, FR, ES, IT, PT-BR, ZH, JA)
-
-> Independent implementation inspired by [KayTool](https://github.com/kk8bit/kaytool)
-> (kk8bit) and [ComfyUI-NodeAligner](https://github.com/Tenney95/ComfyUI-NodeAligner)
-> (Tenney95). No shared code — similar idea, different approach.
+Enable `first_frame_only` for fast preview (applies overlay only to frame 0).

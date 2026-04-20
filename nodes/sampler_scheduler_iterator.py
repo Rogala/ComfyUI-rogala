@@ -41,13 +41,13 @@ class _DynamicReturnTypes(list):
     def __init__(self):
         super().__init__(["SAMPLER", "SCHEDULER", "STRING"])
 
-    def __getitem__(self, idx: int):
+    def __getitem__(self, idx):
         live = [
             comfy.samplers.KSampler.SAMPLERS,
             comfy.samplers.KSampler.SCHEDULERS,
             "STRING",
         ]
-        return live[idx]
+        return live[idx]  # supports int, negative index, and slice
 
     def __iter__(self):
         yield comfy.samplers.KSampler.SAMPLERS
@@ -78,6 +78,10 @@ def _write_json(path: str, data: dict) -> None:
         json.dump(data, fh, indent=4)
 
 
+# Module-level reset flag — set by HTTP route, consumed by next execute()
+_reset_requested: bool = False
+
+
 def refresh_config() -> None:
     """
     Regenerate sampler_scheduler.json from the live KSampler lists.
@@ -100,6 +104,10 @@ def refresh_config() -> None:
     if not os.path.exists(_USER_PATH):
         _write_json(_USER_PATH, ref)
         print("[rogala/SamplerSchedulerIterator] Created sampler_scheduler_user.json")
+
+    global _reset_requested
+    _reset_requested = True
+    print("[rogala/SamplerSchedulerIterator] Counter reset scheduled.")
 
 
 def _load_user_config() -> tuple[list[str], list[str]]:
@@ -148,7 +156,7 @@ Queue stops automatically after the last combination.
 
 ### Inputs
 
-This node has no inputs. Configure combinations in `.\ComfyUI\custom_nodes\ComfyUI-rogala\config\sampler_scheduler_user.json`.
+This node has no inputs. Configure combinations in `.\\ComfyUI\\custom_nodes\\ComfyUI-rogala\\config\\sampler_scheduler_user.json`.
 
 ### Outputs
 
@@ -228,7 +236,14 @@ class SamplerSchedulerIterator:
 
     @classmethod
     def IS_CHANGED(cls, **kwargs) -> float:
-        """Force re-execution on every queue run so the counter advances."""
+        """
+        Force re-execution on every queue run so the counter advances.
+
+        Intentionally returns a random value each time — this signals
+        ComfyUI that the node output is never cacheable. Without this,
+        the counter would not advance between consecutive queue runs.
+        This is by design, not a bug.
+        """
         return random.random()
 
     # ------------------------------------------------------------------
@@ -253,7 +268,20 @@ class SamplerSchedulerIterator:
         total_sch = len(schedulers)
         total     = total_s * total_sch
 
-        # Guard: reset if config shrank since last run
+        # Reset counter if Refresh was pressed
+        global _reset_requested
+        if _reset_requested:
+            self._index = 0
+            _reset_requested = False
+            print("[rogala/SamplerSchedulerIterator] Counter reset by Refresh.")
+
+        # Guard: reset if config shrank since last run, or total is zero (broken config)
+        if total == 0:
+            print("[rogala/SamplerSchedulerIterator] WARNING: no samplers or schedulers loaded — check config.")
+            return {
+                "ui":     {"text": ("ERROR: empty config",), "done": (True,)},
+                "result": ("euler", "normal", "ERROR: empty config"),
+            }
         if self._index >= total:
             self._index = 0
 

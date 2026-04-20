@@ -334,25 +334,25 @@ export function addDocumentation(nodeData, nodeType, opts = {}) {
     const r = origDrawFg ? origDrawFg.apply(this, arguments) : undefined;
     if (this.flags.collapsed) return r;
 
-    // open popup on first render after show_doc becomes true
-    if (this.show_doc && docElement === null) {
+    // open popup only when explicitly set via click (show_doc_by_click flag)
+    if (this.show_doc_by_click && docElement === null) {
       ({ docElement } = createDocPopup(
         nodeData.description,
         this.docCtrl.signal,
         () => {
-          this.show_doc = false;
+          this.show_doc_by_click = false;
           docElement?.remove();
           docElement = null;
         },
         { scaleResize: true }
       ));
-    } else if (!this.show_doc && docElement !== null) {
+    } else if (!this.show_doc_by_click && docElement !== null) {
       docElement.remove();
       docElement = null;
     }
 
     // position popup relative to canvas
-    if (this.show_doc && docElement) {
+    if (this.show_doc_by_click && docElement) {
       const bcr    = app.canvas.canvas.getBoundingClientRect();
       const rect   = ctx.canvas.getBoundingClientRect();
       const scaleX = rect.width  / ctx.canvas.width;
@@ -398,9 +398,9 @@ export function addDocumentation(nodeData, nodeType, opts = {}) {
       localPos[1] > y && localPos[1] < y + iconSize;
 
     if (hit) {
-      this.show_doc = !this.show_doc;
-      if (this.show_doc) { this.docCtrl = new AbortController(); }
-      else               { this.docCtrl?.abort(); }
+      this.show_doc_by_click = !this.show_doc_by_click;
+      if (this.show_doc_by_click) { this.docCtrl = new AbortController(); }
+      else                        { this.docCtrl?.abort(); }
       return true;
     }
     return r;
@@ -427,6 +427,13 @@ app.registerExtension({
     // Apply only to rogala nodes — identified by category starting with "rogala/"
     if (!nodeData.category?.startsWith("rogala/")) return;
     if (!nodeData.description) return;
-    addDocumentation(nodeData, nodeType);
+
+    // Move description out of nodeData before ComfyUI processes it.
+    // This prevents ComfyUI's built-in tooltip/hover mechanism from
+    // showing the popup on mouse-over. We handle display ourselves (click-only).
+    const description = nodeData.description;
+    nodeData.description = "";
+
+    addDocumentation({ ...nodeData, description }, nodeType);
   },
 });

@@ -185,6 +185,7 @@ def _find_param(
 
     Returns None if not found.
     """
+    matches = []
     for node_id, node_data in prompt.items():
         title      = title_map.get(str(node_id), "")
         class_type = node_data.get("class_type", "")
@@ -202,9 +203,15 @@ def _find_param(
                 elif "scheduler" in param_name.lower() and val < len(schedulers):
                     val = schedulers[val]
 
-            return val
+            matches.append(val)
 
-    return None
+    if len(matches) > 1:
+        print(
+            f"[rogala/AlignedTextOverlay] WARNING: found {len(matches)} nodes matching "
+            f"'{node_name}' for param '{param_name}'. "
+            f"Rename nodes explicitly to avoid ambiguity. Using first match."
+        )
+    return matches[0] if matches else None
 
 
 # ---------------------------------------------------------------------------
@@ -311,8 +318,8 @@ class AlignedTextOverlayImages:
                     {
                         "default": 150,
                         "min": 50,
-                        "max": 250,
-                        "tooltip": "Background rectangle opacity (alpha value).",
+                        "max": 255,
+                        "tooltip": "Background rectangle opacity (alpha value, 50–255).",
                     },
                 ),
             },
@@ -347,7 +354,7 @@ class AlignedTextOverlayImages:
         bg_opacity: int,
         prompt=None,
         extra_pnginfo=None,
-        external_text: str = "",
+        external_text=None,
     ) -> tuple:
         """
         Resolve template tags, composite the text onto the image, and return
@@ -385,7 +392,7 @@ class AlignedTextOverlayImages:
         """
         result_text = _resolve_template(text_template, prompt, extra_pnginfo)
 
-        if external_text:
+        if external_text:  # handles None and empty string
             sep = "" if (not result_text or result_text[-1] in (" ", "\n")) else " "
             result_text = f"{result_text}{sep}{external_text}"
 

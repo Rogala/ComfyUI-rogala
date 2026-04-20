@@ -11,23 +11,24 @@
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
 
-// True when the iterator has signalled DONE and we are waiting for
-// the current prompt to finish before stopping the queue.
-let _pendingStop = false;
+// Set of node IDs that have signalled DONE and are waiting for the
+// current prompt to finish before stopping the queue.
+// Using a Set supports multiple SamplerSchedulerIterator nodes in one workflow.
+const _pendingStopNodes = new Set();
 
 // ---------------------------------------------------------------------------
 // Listen for prompt completion — fires after every finished execution
 // ---------------------------------------------------------------------------
 api.addEventListener("execution_success", () => {
-    if (!_pendingStop) return;
-    _pendingStop = false;
+    if (_pendingStopNodes.size === 0) return;
+    _pendingStopNodes.clear();
     _doStop();
 });
 
 // Also handle execution_error so we don't get stuck waiting
 api.addEventListener("execution_error", () => {
-    if (!_pendingStop) return;
-    _pendingStop = false;
+    if (_pendingStopNodes.size === 0) return;
+    _pendingStopNodes.clear();
     _doStop();
 });
 
@@ -55,8 +56,8 @@ app.registerExtension({
             if (message?.done?.[0] === true) {
                 // Don't stop immediately — wait for execution_success so
                 // the last image finishes saving before we interrupt.
-                _pendingStop = true;
-                console.log("[rogala] Last step reached — will stop after prompt completes.");
+                _pendingStopNodes.add(this.id);
+                console.log(`[rogala] Last step reached on node ${this.id} — will stop after prompt completes.`);
             }
 
             this.setDirtyCanvas(true);
@@ -99,15 +100,24 @@ app.registerExtension({
 // ---------------------------------------------------------------------------
 async function _doStop() {
     try {
-        // Click the Stop button if Run (Instant) / Run mode is active
+        // Click the Stop button if Run (Instant) / Run mode is active.
+        // Search by multiple strategies in order of reliability:
+        //   1. data-testid or aria-label (most stable across ComfyUI versions)
+        //   2. text content fallback (legacy, kept for compatibility)
         const allButtons = document.querySelectorAll("button");
+        let stopped = false;
         for (const btn of allButtons) {
-            const txt = btn.textContent?.trim() ?? "";
-            if (txt.includes("Stop Run")) {
+            const label = (btn.getAttribute("aria-label") || btn.getAttribute("data-testid") || "").toLowerCase();
+            const txt   = btn.textContent?.trim() ?? "";
+            if (label.includes("stop") || txt.includes("Stop Run")) {
                 btn.click();
-                console.log("[rogala] Clicked:", txt);
+                console.log("[rogala] Stop button clicked:", txt || label);
+                stopped = true;
                 break;
             }
+        }
+        if (!stopped) {
+            console.warn("[rogala] Stop button not found — falling back to queue clear only.");
         }
 
         // Clear queue + interrupt as fallback for normal Queue mode
