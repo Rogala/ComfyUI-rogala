@@ -112,7 +112,7 @@ Recommended number of images by video duration (targeting ~8 sec per image):
 
 ---
 
-<!-- place workflow screenshot here -->
+<img width="1834" height="871" alt="Знімок екрана (53)" src="https://github.com/user-attachments/assets/1530ff46-81bd-41f7-84e6-61d5a1fde3f8" />
 
 ---
 
