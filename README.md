@@ -28,6 +28,89 @@ ComfyUI-rogala/
 ```
 ---
 
+# Advanced Style Selector 🎨
+
+A custom ComfyUI node for visual style selection with a built-in thumbnail gallery. Applies one or more styles to positive/negative prompts and encodes them directly to **CONDITIONING** — no extra CLIPTextEncode node needed.
+
+---
+
+## Features
+
+- **Visual gallery** — browse styles as thumbnails with category filtering and search
+- **Up to 6 styles simultaneously** — selected styles are merged into a single conditioning output
+- **Two modes** — Manual (click to select) and Iterator (cycles through styles automatically, one per queue run)
+- **Favorites** — click ⭐ on any thumbnail to save it to `config/favorites_styles.json`, appears as a separate category at the top
+- **name_timestamp** — optional checkbox to append a timestamp to `style_name` output for unique filenames when connected to Save Image
+- **Category colors** — each category has a unique color across the full hue wheel
+- **Hover popup** — shows full prompt and negative prompt text on thumbnail hover
+- **Live reload** — reload styles from disk without restarting ComfyUI
+- **Theme aware** — follows ComfyUI light/dark theme via CSS variables
+- **Resizable** — gallery height grows with the node when you drag it taller
+- **Negative conditioning control** — toggle between encoded negative or ConditioningZeroOut (for Flux, SD3, etc.)
+- **Styles format** — `config/styles.json`, each entry has `name`, `category`, `prompt`, `negative_prompt`, `thumbnail`. Use `{prompt}` in prompt field to insert user text at a specific position.
+- **Installation** — Find the node under **rogala/Prompting → Advanced Style Selector**
+
+---
+
+## Inputs
+
+| Pin | Type | Description |
+|-----|------|-------------|
+| `clip` | CLIP | Connect from Load Checkpoint |
+| `positive_text` | STRING | Your positive prompt. Styles are applied on top. |
+| `negative_text` | STRING | Your negative prompt. Hidden when use_negative is OFF. |
+
+### Hidden widget inputs (controlled by the gallery UI)
+
+| Widget | Description |
+|--------|-------------|
+| `use_negative` | ON: encode negative normally. OFF: output ConditioningZeroOut |
+| `mode` | Manual or Iterator |
+| `style_1` … `style_6` | Active style slots (synced by the gallery) |
+| `iterator_categories` | Comma-separated categories to iterate over (empty = all) |
+| `iterator_seed` | Seed for iterator order (0 = alphabetical) |
+| `append_counter` | Enable name_timestamp suffix on style_name output |
+
+---
+
+## Outputs
+
+| Pin | Type | Description |
+|-----|------|-------------|
+| `positive` | CONDITIONING | Encoded positive prompt with all selected styles applied |
+| `negative` | CONDITIONING | Encoded negative prompt, or ConditioningZeroOut |
+| `style_name` | STRING | Active style names joined by `-` for use in file naming |
+
+---
+
+## Modes
+
+### Manual
+Select up to 6 styles by clicking thumbnails in the gallery. Active styles appear in the strip at the top of the panel as thumbnails with their slot number. Click `×` to remove a style, or use the 🗑 button to clear all.
+
+### Iterator
+Cycles through all styles in the selected categories automatically — one style per queue run. Stops after the last style and resets. Use **Reload Styles** after changing the style list to reset the iterator.
+
+---
+
+## Gallery UI
+
+| Element | Description |
+|---------|-------------|
+| 🗑 (left of categories) | Clear selected category filters |
+| Category pills | Click to filter gallery by category. Active categories are highlighted in their category color |
+| ⭐ Favorites | First category if non-empty. Click ⭐ on any thumbnail to add/remove |
+| Active strip | Shows currently selected styles as thumbnails. Hover for prompt details |
+| 🗑 (in strip) | Clear all selected styles |
+| Search | Filter by style name |
+| Thumbnail grid | Click to select/deselect. Badge shows slot number (1–6) |
+| `use_negative` | Toggle negative conditioning mode |
+| `name_timestamp` | Toggle timestamp suffix on style_name output |
+| Mode selector | Switch between Manual and Iterator |
+| Reload Styles | Hot-reload `config/styles.json` without restarting ComfyUI |
+
+---
+
 ## Script for Aligning Nodes
 
 A lightweight frontend extension that adds a persistent toolbar at the bottom of the canvas

@@ -3,10 +3,14 @@ FMLFLTX_2.3
 ===========
 Loads up to 6 images and automatically distributes them across the video:
   - image_1 → frame 0 (First Frame, FF)
-  - image_N → frame (length - 1*fps) (Last Frame, LF — 1 second before end)
+  - image_N → frame (length - 1) (Last Frame, LF — hard anchor for sampler)
   - image_2..N-1 → evenly spaced between FF and LF
 
 The node counts connected images automatically — no manual frame index needed.
+
+Outputs segment_lengths (pixel-space) for direct connection to PromptRelayEncode.
+Segments are calculated between all frames EXCEPT the last anchor (image_N),
+because the sampler re-embeds end_image itself in Pass 2.
 
 Category : rogala/Video
 """
@@ -38,10 +42,13 @@ Prepares video and audio latents for LTX Video 2.3 from up to 6 guide images.
 
 Images are automatically placed at evenly-spaced positions:
 - **image_1** → frame 0 (First Frame).
-- **image_N** → 1 second before the end (Last Frame).
-- **image_2 … image_N-1** → evenly distributed between FF and LF.
+- **image_N** → frame (length - 1) (Last Frame — hard anchor, re-embedded by sampler in Pass 2).
+- **image_2 … image_N-1** → evenly spaced at `round((length-1) * i / (N-1))` for i = 1..N-2.
 
 Connect `width`, `height`, `length`, and `fps` from **LTX Resolution Selector**.
+
+`segment_lengths` output is calculated between all frames except the last anchor,
+and can be connected directly to **PromptRelayEncode**.
 
 ---
 
@@ -55,7 +62,7 @@ Connect `width`, `height`, `length`, and `fps` from **LTX Resolution Selector**.
 | `width` | Latent width in pixels — connect from LTX Resolution Selector. |
 | `height` | Latent height in pixels — connect from LTX Resolution Selector. |
 | `length` | Frame count — connect from LTX Resolution Selector. |
-| `fps` | Frames per second — connect from LTX Resolution Selector. |
+| `fps` | Frames per second — used for audio latent duration. Connect from LTX Resolution Selector. |
 | `batch_size` | Batch size (default 1). |
 | `image_1 … image_6` | Guide images (optional). Connect only the slots you need. |
 | `strength_1 … strength_6` | Conditioning strength per image (1.0 = fully conditioned, 0.0 = ignored). |
@@ -67,6 +74,7 @@ Connect `width`, `height`, `length`, and `fps` from **LTX Resolution Selector**.
 | `latent` | Combined video + audio NestedTensor — for direct sampler input (legacy). |
 | `video_latent` | Video latent only → connect to **SamplerLTXV_2.3** `video_latent`. |
 | `audio_latent` | Empty audio latent → connect to **SamplerLTXV_2.3** `audio_latent`. |
+| `segment_lengths` | Pixel-space frame counts per segment → connect to **PromptRelayEncode**. |
 """
 
 # ---------------------------------------------------------------------------
@@ -107,13 +115,49 @@ def _encode_image(video_vae, image_tensor: torch.Tensor,
     return video_vae.encode(resized[:, :, :, :3])
 
 
-def _calc_insert_frames(num_images: int, length: int, fps: float) -> list[int]:
+def _calc_insert_frames(num_images: int, length: int) -> list[int]:
     """
     Calculate pixel-space frame indices for each image.
-    Frames are evenly distributed from frame 0:
-    frame_i = round(length * i / num_images) for i in 0..num_images-1.
+
+    - image_1  → frame 0          (FF, hard anchor)
+    - image_N  → frame length-1   (LF, hard anchor — sampler re-embeds in Pass 2)
+    - image_2..N-1 → evenly spaced between 0 and length-1
+
+    With 1 image: [0]
+    With 2 images: [0, length-1]
+    With N images: evenly from 0 to length-1 inclusive
     """
-    return [round(length * i / num_images) for i in range(num_images)]
+    if num_images == 1:
+        return [0]
+    if num_images == 2:
+        return [0, length - 1]
+    return [round((length - 1) * i / (num_images - 1)) for i in range(num_images)]
+
+
+def _calc_segment_lengths(insert_frames: list[int], length: int) -> str:
+    """
+    Calculate pixel-space segment lengths for PromptRelayEncode.
+
+    Segments are counted between all frames EXCEPT the last one,
+    because image_N is a hard sampler anchor — not a prompt segment.
+
+    Example with 4 images at [0, 32, 64, 96] and length=97:
+      segments = [32, 32, 32]  → "32,32,32"
+    """
+    if len(insert_frames) <= 1:
+        return ""
+
+    # All anchor frames except the last (LF anchor)
+    seg_frames = insert_frames[:-1]
+
+    segments = []
+    for i in range(len(seg_frames) - 1):
+        segments.append(seg_frames[i + 1] - seg_frames[i])
+
+    # Last segment: from last middle anchor to end of video
+    segments.append(length - 1 - seg_frames[-1])
+
+    return ",".join(str(s) for s in segments)
 
 
 # ---------------------------------------------------------------------------
@@ -129,8 +173,8 @@ class FmlfLtx23:
     CATEGORY     = _CATEGORY
     FUNCTION     = "execute"
     DESCRIPTION  = _DESCRIPTION
-    RETURN_TYPES = ("LATENT", "LATENT", "LATENT")
-    RETURN_NAMES = ("latent", "video_latent", "audio_latent")
+    RETURN_TYPES = ("LATENT", "LATENT", "LATENT", "STRING")
+    RETURN_NAMES = ("latent", "video_latent", "audio_latent", "segment_lengths")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -168,7 +212,7 @@ class FmlfLtx23:
 
         _slot_labels = {
             1: "First frame (FF) — automatically placed at frame 0.",
-            6: "Last frame (LF) — automatically placed 1 second before the end.",
+            6: "Last connected image becomes the Last Frame (LF) — hard anchor for sampler Pass 2.",
         }
         for i in range(1, _MAX_IMGS + 1):
             tip = _slot_labels.get(i, f"Middle frame {i - 1} — evenly spaced between FF and LF.")
@@ -213,6 +257,8 @@ class FmlfLtx23:
         )
 
         # ── Encode and insert guide images ─────────────────────────────────
+        insert_frames = []
+
         if num_images > 0:
             scale_factors = video_vae.downscale_index_formula
             time_scale    = int(scale_factors[0])
@@ -221,7 +267,7 @@ class FmlfLtx23:
             px_target_w   = latent_w * w_scale
             px_target_h   = latent_h * h_scale
 
-            insert_frames = _calc_insert_frames(num_images, length, fps)
+            insert_frames = _calc_insert_frames(num_images, length)
 
             for idx, (slot, image) in enumerate(images_by_slot.items()):
                 f_idx    = insert_frames[idx]
@@ -239,6 +285,11 @@ class FmlfLtx23:
 
                 print(f"[FMLFLTX_2.3] slot={slot} → pixel_frame={f_idx} "
                       f"latent_idx={latent_idx} strength={strength}")
+
+        # ── Segment lengths for PromptRelayEncode ─────────────────────────
+        segment_lengths_str = _calc_segment_lengths(insert_frames, length)
+        if segment_lengths_str:
+            print(f"[FMLFLTX_2.3] segment_lengths → {segment_lengths_str}")
 
         # ── Empty audio latent ─────────────────────────────────────────────
         frame_rate    = int(round(fps))
@@ -260,7 +311,7 @@ class FmlfLtx23:
         video_latent = {"samples": video_samples,    "noise_mask": noise_mask}
         audio_latent = {"samples": audio_samples,    "noise_mask": audio_mask}
 
-        return (main_latent, video_latent, audio_latent)
+        return (main_latent, video_latent, audio_latent, segment_lengths_str)
 
 
 # ---------------------------------------------------------------------------

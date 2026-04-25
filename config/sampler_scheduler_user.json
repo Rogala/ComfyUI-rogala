@@ -12,6 +12,7 @@
         "dpm_2_ancestral",
         "lms",
         "dpm_fast",
+        "dpm_adaptive",
         "dpmpp_2s_ancestral",
         "dpmpp_2s_ancestral_cfg_pp",
         "dpmpp_sde",
@@ -64,6 +65,6 @@
         "res_2m"
     ],
     "schedulers": [
-        "linear_quadratic"
+        "simple"
     ]
 }
