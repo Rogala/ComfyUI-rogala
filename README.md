@@ -52,6 +52,10 @@ A custom ComfyUI node for visual style selection with a built-in thumbnail galle
 
 ---
 
+<img width="1502" height="844" alt="style2" src="https://github.com/user-attachments/assets/4a2182ad-aa45-4066-b2a4-f64cdca9a6de" />
+
+---
+
 ## Inputs
 
 | Pin | Type | Description |
