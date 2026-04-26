@@ -38,13 +38,29 @@ const CSS = `
   overflow: hidden;
 }
 .rg-header { display: none; }  /* legacy — header removed in v14 */
+.rg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-bottom: 1px solid var(--border-color, #2d4a38);
+  border-radius: 6px 6px 0 0;
+  flex-wrap: wrap;
+}
+.rg-model-sel {
+  background: var(--comfy-input-bg, #1a2820);
+  border: 1px solid var(--border-color, #2d4a38);
+  border-radius: 4px;
+  color: var(--fg-color, #c8e8c8); font-family: monospace; font-size: 13px;
+  padding: 4px 8px; cursor: pointer;
+  flex: 1 1 auto; min-width: 0;
+}
 .rg-cats-row {
   display: flex;
   align-items: stretch;
   gap: 6px;
   padding: 6px;
   border-bottom: 1px solid var(--border-color, #2d4a38);
-  border-radius: 6px 6px 0 0;
 }
 .rg-cats-row > .rg-trash {
   align-self: center;
@@ -265,7 +281,7 @@ const CSS = `
 }
 .rg-use-neg {
   display: flex; align-items: center; gap: 8px;
-  font-size: 12px; color: var(--fg-color, #c8e8c8); cursor: pointer;
+  font-size: 14px; color: var(--fg-color, #c8e8c8); cursor: pointer;
 }
 .rg-use-neg input { accent-color: #4aaa6a; cursor: pointer; width: 16px; height: 16px; }
 .rg-reload-btn {
@@ -406,6 +422,7 @@ class StylePanel {
     this.search     = "";
     this.filtered   = [];
     this.loaded     = false;
+    this._thumbTimestamp = Date.now();
     this._elCats    = null;
     this._elStrip   = null;
     this._elSearch  = null;
@@ -462,9 +479,10 @@ class StylePanel {
 
   async _load() {
     try {
-      const [stylesRes, favsRes] = await Promise.all([
+      const [stylesRes, favsRes, modelsRes] = await Promise.all([
         fetch("/rogala/styles"),
         fetch("/rogala/favorites"),
+        fetch("/rogala/thumbnails/presets"),
       ]);
       if (!stylesRes.ok) throw new Error(stylesRes.status);
       this.styles = await stylesRes.json();
@@ -473,6 +491,29 @@ class StylePanel {
       if (favsRes.ok) {
         const favsData = await favsRes.json();
         this.favorites = new Set(favsData.favorites || []);
+      }
+
+      // Populate model preset dropdown
+      if (modelsRes.ok && this._elModel) {
+        const modelsData = await modelsRes.json();
+        const presets = modelsData.presets || [];
+		const savedModel = this._elModel.value;
+        // Keep only the default option, add presets after
+        while (this._elModel.options.length > 1) this._elModel.remove(1);
+        for (const p of presets) {
+          const o = document.createElement('option');
+          o.value = p; o.textContent = p;
+          this._elModel.appendChild(o);
+        }
+        if (savedModel && [...this._elModel.options].some(o => o.value === savedModel)) {
+          this._elModel.value = savedModel;
+        } else {
+          // Also try to restore from widget value (e.g. after tab switch)
+          const tpw = this._w('thumbnail_preset');
+          if (tpw?.value && [...this._elModel.options].some(o => o.value === tpw.value)) {
+            this._elModel.value = tpw.value;
+          }
+        }
       }
 
       // Build categories list — Favorites first if non-empty, then alphabetical
@@ -559,7 +600,47 @@ class StylePanel {
 
     console.log("[rogala] Style Gallery v17-fixed loaded");
 
-    // Categories row: [trash button] [wrapping categories]
+    // ── Toolbar: mode selector + model preset + reload ──────────────────
+    const toolbar = document.createElement("div");
+    toolbar.className = "rg-toolbar";
+
+    this._elMode = document.createElement('select');
+    this._elMode.className = 'rg-mode-sel';
+    this._elMode.style.flex = '0 0 auto';
+    ['Manual','Iterator'].forEach(m => {
+      const o = document.createElement('option'); o.value = m; o.textContent = m;
+      this._elMode.appendChild(o);
+    });
+    this._elMode.addEventListener('change', e => { if (this._onModeChange) this._onModeChange(e.target.value); });
+    toolbar.appendChild(this._elMode);
+
+    // Model preset dropdown — populated from thumbnails/styles subfolders via API
+    this._elModel = document.createElement('select');
+    this._elModel.className = 'rg-model-sel';
+    this._elModel.title = "Select model thumbnail preset. Folders must be named with letters, digits and underscores only (e.g. FLUX_1, SDXL_base). Create a subfolder in thumbnails/styles/ with your model name and place style thumbnails there.";
+    const _defaultOpt = document.createElement('option');
+    _defaultOpt.value = ''; _defaultOpt.textContent = 'Default thumbnails (base SDXL 1.0)';
+    this._elModel.appendChild(_defaultOpt);
+    this._elModel.addEventListener('change', () => {
+      const w = this._w('thumbnail_preset');
+      if (w) w.value = this._elModel.value;
+      this._thumbTimestamp = Date.now();
+      this._renderGrid(true);
+    });
+    toolbar.appendChild(this._elModel);
+
+    this._elReload = document.createElement('button');
+    this._elReload.className = 'rg-reload-btn';
+    this._elReload.textContent = 'Reload Styles';
+    this._elReload.addEventListener('click', async () => {
+      await fetch('/rogala/reload_styles', { method: 'POST' });
+      await this.reload();
+    });
+    toolbar.appendChild(this._elReload);
+
+    panel.appendChild(toolbar);
+
+    // ── Categories row ───────────────────────────────────────────────────
     const catsRow = document.createElement("div");
     catsRow.className = "rg-cats-row";
 
@@ -605,7 +686,7 @@ class StylePanel {
     panel.appendChild(this._elGrid);
 
 
-    // footer with use_negative + reload
+    // footer — checkboxes only
     const footer = document.createElement('div');
     footer.className = 'rg-footer';
 
@@ -617,8 +698,7 @@ class StylePanel {
     this._elUseNeg.appendChild(negCb);
     this._elUseNeg.appendChild(document.createTextNode(' use_negative'));
     footer.appendChild(this._elUseNeg);
-    
-	// append counter toggle
+
     this._elAppendCounter = document.createElement('label');
     this._elAppendCounter.className = 'rg-use-neg';
     const counterCb = document.createElement('input');
@@ -631,7 +711,6 @@ class StylePanel {
     this._elAppendCounter.appendChild(document.createTextNode(' name_timestamp'));
     footer.appendChild(this._elAppendCounter);
 
-    // save prompt toggle
     this._elSavePrompt = document.createElement('label');
     this._elSavePrompt.className = 'rg-use-neg';
     const saveCb = document.createElement('input');
@@ -643,25 +722,7 @@ class StylePanel {
     this._elSavePrompt.appendChild(saveCb);
     this._elSavePrompt.appendChild(document.createTextNode(' save_prompt'));
     footer.appendChild(this._elSavePrompt);
-	
-    // mode selector
-    this._elMode = document.createElement('select');
-    this._elMode.className = 'rg-mode-sel';
-    ['Manual','Iterator'].forEach(m => {
-      const o = document.createElement('option'); o.value = m; o.textContent = m;
-      this._elMode.appendChild(o);
-    });
-    this._elMode.addEventListener('change', e => { if (this._onModeChange) this._onModeChange(e.target.value); });
-    footer.appendChild(this._elMode);
 
-    this._elReload = document.createElement('button');
-    this._elReload.className = 'rg-reload-btn';
-    this._elReload.textContent = 'Reload Styles';
-    this._elReload.addEventListener('click', async () => {
-      await fetch('/rogala/reload_styles', { method: 'POST' });
-      await this.reload();
-    });
-    footer.appendChild(this._elReload);
     panel.appendChild(footer);
 
     this.el = panel;
@@ -735,9 +796,13 @@ class StylePanel {
         img.className = "rg-mini-img";
         if (s.thumbnail) {
           const fn = s.thumbnail.split(/[\\/]/).pop();
+          const model = this._elModel?.value || '';
+          const base = model ? `/rogala/thumbnails/${model}/${fn}` : `/rogala/thumbnails/styles/${fn}`;
           const imgEl = document.createElement("img");
-          imgEl.src = `/rogala/thumbnails/styles/${fn}?t=${Date.now()}`;
-          imgEl.onerror = () => { imgEl.style.display = "none"; };
+          imgEl.src = `${base}?t=${this._thumbTimestamp}`;
+          imgEl.onerror = () => {
+            if (model) { imgEl.onerror = null; imgEl.src = `/rogala/thumbnails/styles/${fn}?t=${this._thumbTimestamp}`; }
+          };
           img.appendChild(imgEl);
         } else {
           const init = document.createElement("span");
@@ -792,9 +857,20 @@ class StylePanel {
     if (style.thumbnail) {
       const fn  = style.thumbnail.split(/[\\/]/).pop();
       const img = document.createElement("img");
-      img.src   = `/rogala/thumbnails/styles/${fn}?t=${Date.now()}`;
+      const model = this._elModel?.value || '';
+      const base = model ? `/rogala/thumbnails/${model}/${fn}` : `/rogala/thumbnails/styles/${fn}`;
+      img.src = `${base}?t=${this._thumbTimestamp}`;
       img.style.display = "none";
       img.onload  = () => { img.style.display = ""; init2.style.display = "none"; };
+      // fallback to base folder if model-specific thumbnail not found
+      img.onerror = () => {
+        if (model) {
+          img.onerror = null;
+          img.src = `/rogala/thumbnails/styles/${fn}?t=${this._thumbTimestamp}`;
+          img.style.display = "";
+          init2.style.display = "none";
+        }
+      };
       imgBox.appendChild(img);
     }
 
@@ -907,7 +983,7 @@ app.registerExtension({
       // the workflow. Instead we mark them as converted-widget AND override
       // computeSize to [0, 0] (not -4) so the canvas renderer doesn't paint
       // a faint outline in the gap between textareas and the DOM panel.
-      const HIDE = ["style_1","style_2","style_3","style_4","style_5","style_6","iterator_categories","mode","iterator_seed","append_counter","save_prompt"];
+      const HIDE = ["style_1","style_2","style_3","style_4","style_5","style_6","iterator_categories","mode","iterator_seed","append_counter","save_prompt","thumbnail_preset"];
       for (const name of HIDE) {
         const w = this.widgets?.find(w => w.name === name);
         if (w) {
@@ -994,6 +1070,14 @@ app.registerExtension({
         const spw = _findWidget("save_prompt");
         const spb = sp._elSavePrompt?.querySelector("input");
         if (spb && spw) spb.checked = spw.value === true;
+        const tpw = _findWidget("thumbnail_preset");
+        if (tpw?.value && sp._elModel) {
+          const opts = [...sp._elModel.options];
+          if (opts.some(o => o.value === tpw.value)) {
+            sp._elModel.value = tpw.value;
+            sp._thumbTimestamp = Date.now();
+          }
+        }
         if (sp._elMode && mw) sp._elMode.value = mw.value || "Manual";
 
         // Restore use_negative state without triggering setDirtyCanvas.

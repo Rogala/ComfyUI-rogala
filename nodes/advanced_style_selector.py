@@ -102,17 +102,40 @@ no extra CLIPTextEncode node needed.
 When enabled, appends a timestamp to `style_name` output:
 `abstract_20250424_143022` — guarantees unique filenames when connected to Save Image.
 
+### save_prompt
+
+When enabled, saves positive and negative prompts to a JSON file in
+`ComfyUI/output/prompts/` after each run. Useful for keeping a record of
+which prompts generated which images.
+
 ### Favorites
 
 Click ⭐ on any thumbnail to add it to Favorites. Favorites are saved to
 `config/favorites_styles.json` and appear as a separate category at the top
 of the category list. Click ⭐ again to remove.
 
+### Model thumbnails (coming soon)
+
+Each style has a default thumbnail in `thumbnails/styles/`. You can add
+per-model thumbnails by creating a subfolder named after your model:
+
+    thumbnails/styles/FLUX_1/
+    thumbnails/styles/SDXL_base/
+    thumbnails/styles/WAN_2_2/
+
+Folder naming rules: use only letters, digits and underscores.
+No spaces, hyphens or dots — these cause issues across different operating
+systems. Example: `FLUX_1` not `FLUX-1` or `FLUX.1`.
+
+When a model folder is selected, thumbnails are loaded from that folder.
+If a style has no thumbnail there, it falls back to the base folder.
+
 ---
 
 Styles are loaded from `config/styles.json`.
-Thumbnails are loaded from `thumbnails/styles/*.jpg`.
+Thumbnails are loaded from `thumbnails/styles/`.
 Favorites are saved to `config/favorites_styles.json`.
+Prompts are saved to `output/prompts/` when save_prompt is enabled.
 """
 
 # ---------------------------------------------------------------------------
@@ -339,6 +362,10 @@ class AdvancedStyleSelector:
                     "default": False,
                     "tooltip": "Save positive and negative prompts to a JSON file in output/prompts/.",
                 }),
+                "thumbnail_preset": ("STRING", {
+                    "default": "",
+                    "tooltip": "Active model thumbnail preset folder name.",
+                }),
             }
         }
 
@@ -365,6 +392,7 @@ class AdvancedStyleSelector:
         iterator_seed: int,
         append_counter: bool,
         save_prompt: bool,
+        thumbnail_preset: str,
     ):
         global _iter_index, _iter_reset
         _ensure_styles()

@@ -95,6 +95,33 @@ try:
             return web.FileResponse(path, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
         return web.Response(status=404)
 
+    @PromptServer.instance.routes.get("/rogala/thumbnails/{model}/{filename}")
+    async def _get_thumbnail_model(request):
+        import os
+        from .nodes.advanced_style_selector import _THUMBS_DIR
+        model    = os.path.basename(request.match_info["model"])
+        filename = os.path.basename(request.match_info["filename"])
+        # Model folders sit next to the base "styles" folder, not inside it
+        thumbs_parent = os.path.dirname(_THUMBS_DIR)
+        path = os.path.join(thumbs_parent, model, filename)
+        if os.path.isfile(path):
+            return web.FileResponse(path, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+        return web.Response(status=404)
+
+    @PromptServer.instance.routes.get("/rogala/thumbnails/presets")
+    async def _get_thumbnail_presets(request):
+        import os
+        from .nodes.advanced_style_selector import _THUMBS_DIR
+        try:
+            thumbs_parent = os.path.dirname(_THUMBS_DIR)
+            presets = sorted([
+                d for d in os.listdir(thumbs_parent)
+                if os.path.isdir(os.path.join(thumbs_parent, d)) and d != "styles"
+            ])
+            return web.json_response({"presets": presets})
+        except Exception as e:
+            return web.json_response({"presets": [], "error": str(e)})
+
     @PromptServer.instance.routes.get("/rogala/favorites")
     async def _get_favorites(request):
         try:

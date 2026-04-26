@@ -41,9 +41,11 @@ A custom ComfyUI node for visual style selection with a built-in thumbnail galle
 - **Two modes** — Manual (click to select) and Iterator (cycles through styles automatically, one per queue run)
 - **Favorites** — click ⭐ on any thumbnail to save it to `config/favorites_styles.json`, appears as a separate category at the top
 - **name_timestamp** — optional checkbox to append a timestamp to `style_name` output for unique filenames when connected to Save Image
+- **save_prompt** — optional checkbox to save positive and negative prompts to a JSON file in `output/prompts/` after each run
 - **Category colors** — each category has a unique color across the full hue wheel
 - **Hover popup** — shows full prompt and negative prompt text on thumbnail hover
 - **Live reload** — reload styles from disk without restarting ComfyUI
+- **Model thumbnail presets** — create a subfolder in `thumbnails/` named after your model (e.g. `FLUX_1`, `WAN_2_2`) and place style thumbnails there. Select the preset from the dropdown in the node — missing thumbnails fall back to the base `styles/` folder. Folder names: letters, digits and underscores only.
 - **Theme aware** — follows ComfyUI light/dark theme via CSS variables
 - **Resizable** — gallery height grows with the node when you drag it taller
 - **Negative conditioning control** — toggle between encoded negative or ConditioningZeroOut (for Flux, SD3, etc.)
