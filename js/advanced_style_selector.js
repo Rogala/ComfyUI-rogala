@@ -265,7 +265,7 @@ const CSS = `
 }
 .rg-use-neg {
   display: flex; align-items: center; gap: 8px;
-  font-size: 14px; color: var(--fg-color, #c8e8c8); cursor: pointer;
+  font-size: 12px; color: var(--fg-color, #c8e8c8); cursor: pointer;
 }
 .rg-use-neg input { accent-color: #4aaa6a; cursor: pointer; width: 16px; height: 16px; }
 .rg-reload-btn {
@@ -630,6 +630,19 @@ class StylePanel {
     this._elAppendCounter.appendChild(counterCb);
     this._elAppendCounter.appendChild(document.createTextNode(' name_timestamp'));
     footer.appendChild(this._elAppendCounter);
+
+    // save prompt toggle
+    this._elSavePrompt = document.createElement('label');
+    this._elSavePrompt.className = 'rg-use-neg';
+    const saveCb = document.createElement('input');
+    saveCb.type = 'checkbox'; saveCb.checked = false;
+    saveCb.addEventListener('change', e => {
+      const w = this._w('save_prompt');
+      if (w) w.value = e.target.checked;
+    });
+    this._elSavePrompt.appendChild(saveCb);
+    this._elSavePrompt.appendChild(document.createTextNode(' save prompt'));
+    footer.appendChild(this._elSavePrompt);
 	
     // mode selector
     this._elMode = document.createElement('select');
@@ -894,7 +907,7 @@ app.registerExtension({
       // the workflow. Instead we mark them as converted-widget AND override
       // computeSize to [0, 0] (not -4) so the canvas renderer doesn't paint
       // a faint outline in the gap between textareas and the DOM panel.
-      const HIDE = ["style_1","style_2","style_3","style_4","style_5","style_6","iterator_categories","mode","iterator_seed","append_counter"];
+      const HIDE = ["style_1","style_2","style_3","style_4","style_5","style_6","iterator_categories","mode","iterator_seed","append_counter","save_prompt"];
       for (const name of HIDE) {
         const w = this.widgets?.find(w => w.name === name);
         if (w) {
@@ -978,6 +991,9 @@ app.registerExtension({
         const acw = _findWidget("append_counter");
         const acb = sp._elAppendCounter?.querySelector("input");
         if (acb && acw) acb.checked = acw.value === true;
+        const spw = _findWidget("save_prompt");
+        const spb = sp._elSavePrompt?.querySelector("input");
+        if (spb && spw) spb.checked = spw.value === true;
         if (sp._elMode && mw) sp._elMode.value = mw.value || "Manual";
 
         // Restore use_negative state without triggering setDirtyCanvas.

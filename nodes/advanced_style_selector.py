@@ -42,6 +42,7 @@ import re
 from datetime import datetime
 
 import torch
+import folder_paths
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -334,6 +335,10 @@ class AdvancedStyleSelector:
                     "default": False,
                     "tooltip": "Append a timestamp to style_name output for unique filenames (e.g. abstract_20250424_143022).",
                 }),
+                "save_prompt": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Save positive and negative prompts to a JSON file in output/prompts/.",
+                }),
             }
         }
 
@@ -359,6 +364,7 @@ class AdvancedStyleSelector:
         iterator_categories: str,
         iterator_seed: int,
         append_counter: bool,
+        save_prompt: bool,
     ):
         global _iter_index, _iter_reset
         _ensure_styles()
@@ -422,6 +428,27 @@ class AdvancedStyleSelector:
             style_name = f"{base_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         else:
             style_name = base_name
+
+        # ── Save prompt to JSON ────────────────────────────────────────────
+        if save_prompt:
+            try:
+                prompts_dir = os.path.join(folder_paths.get_output_directory(), "prompts")
+                os.makedirs(prompts_dir, exist_ok=True)
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                fname = f"{style_name}_{ts}.json" if not append_counter else f"{style_name}.json"
+                fpath = os.path.join(prompts_dir, fname)
+                payload = {
+                    "style_name": style_name,
+                    "styles": [s.get("name") for s in selected_styles],
+                    "positive": final_pos,
+                    "negative": final_neg,
+                    "timestamp": ts,
+                }
+                with open(fpath, "w", encoding="utf-8") as f:
+                    json.dump(payload, f, ensure_ascii=False, indent=2)
+                print(f"[AdvancedStyleSelector] Prompt saved: {fpath}")
+            except Exception as e:
+                print(f"[AdvancedStyleSelector] Failed to save prompt: {e}")
 
         return {
             "ui":     {"text": (progress,), "done": (done,)},
