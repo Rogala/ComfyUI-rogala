@@ -641,7 +641,7 @@ class StylePanel {
       if (w) w.value = e.target.checked;
     });
     this._elSavePrompt.appendChild(saveCb);
-    this._elSavePrompt.appendChild(document.createTextNode(' save prompt'));
+    this._elSavePrompt.appendChild(document.createTextNode(' save_prompt'));
     footer.appendChild(this._elSavePrompt);
 	
     // mode selector
