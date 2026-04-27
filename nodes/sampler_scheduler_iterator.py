@@ -205,7 +205,7 @@ class SamplerSchedulerIterator:
     scheduler : SCHEDULER
         The current scheduler string.
     external_text : STRING
-        Formatted string "sampler | scheduler" for use in text overlays.
+        Formatted string "sampler-scheduler" for use in text overlays.
     """
 
     # ------------------------------------------------------------------
@@ -289,7 +289,7 @@ class SamplerSchedulerIterator:
         sampler   = samplers[(idx // total_sch) % total_s]
         scheduler = schedulers[idx % total_sch]
 
-        external_text = f"{sampler} | {scheduler}"
+        external_text = f"{sampler}-{scheduler}"
         self._index  += 1
         done          = self._index >= total
 

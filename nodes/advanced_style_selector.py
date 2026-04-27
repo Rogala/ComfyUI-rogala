@@ -165,9 +165,32 @@ def _get_categories(styles: list[dict]) -> list[str]:
 
 
 def _styles_in_categories(styles: list[dict], categories: list[str]) -> list[dict]:
-    if not categories:
-        return styles
-    return [s for s in styles if s.get("category", "Other") in categories]
+    FAVORITES_CAT = "⭐ Favorites"
+    result = []
+    seen_keys = set()
+
+    # Load favorites keys if needed
+    fav_keys: set[str] = set()
+    if FAVORITES_CAT in categories:
+        try:
+            fav_path = os.path.join(_CONFIG_DIR, "favorites_styles.json")
+            with open(fav_path, "r", encoding="utf-8") as f:
+                fav_keys = set(json.load(f).get("favorites", []))
+        except Exception:
+            pass
+
+    for s in styles:
+        cat = s.get("category", "Other")
+        key = f"{cat}::{s.get('name', '')}"
+        if key in seen_keys:
+            continue
+        in_fav = FAVORITES_CAT in categories and key in fav_keys
+        in_cat = cat in categories
+        if in_fav or in_cat:
+            result.append(s)
+            seen_keys.add(key)
+
+    return result
 
 
 def _find_style(styles: list[dict], key: str) -> dict | None:
@@ -373,6 +396,8 @@ class AdvancedStyleSelector:
     def IS_CHANGED(cls, **kwargs):
         if kwargs.get("mode") == "Iterator":
             return random.random()
+        if kwargs.get("append_counter"):
+            return random.random()
         return None
 
     def execute(
@@ -453,7 +478,7 @@ class AdvancedStyleSelector:
         # ── Style name for file naming ─────────────────────────────────────
         base_name = _make_style_name(selected_styles)
         if append_counter:
-            style_name = f"{base_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            style_name = f"{base_name}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:23]}"
         else:
             style_name = base_name
 

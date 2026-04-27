@@ -158,37 +158,87 @@ app.registerExtension({
 
         window.addEventListener('resize', applySize);
 
+        // ─── Collapse state ───────────────────────────────────────
+        let isCollapsed = false;
+
+        // ─── Wrapper (fixed anchor — contains panel + line handle) ─
+        const wrapper = document.createElement("div");
+        wrapper.style.cssText = `
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10001;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        `;
+
         // ─── Panel ────────────────────────────────────────────────
         const menu = document.createElement("div");
 
         menu.style.cssText = `
-            position: fixed;
-            bottom: 6px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10001;
             background: rgba(20, 20, 20, 0.85);
             border: 1px solid #444;
             display: flex;
             align-items: center;
             padding: 8px 12px;
             gap: 6px;
-            border-radius: 12px;
+            border-radius: 12px 12px 0 0;
             box-shadow: 0 -5px 25px rgba(0,0,0,0.6);
             backdrop-filter: blur(10px);
             opacity: 0.5;
-            transition: opacity 0.3s ease, border-color 0.3s ease, bottom 0.3s ease;
+            transition: opacity 0.3s ease, border-color 0.3s ease,
+                        transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         `;
 
-        // Wake up on hover
+        // ─── Line handle (variant B) ───────────────────────────────
+        // Thin pill-shaped bar, always visible at the bottom.
+        // Orange when collapsed, gray when expanded.
+        const handle = document.createElement("div");
+        handle.title = "Show / Hide toolbar";
+        handle.style.cssText = `
+            width: 48px;
+            height: 4px;
+            background: #555;
+            border-radius: 2px 2px 0 0;
+            cursor: pointer;
+            transition: background 0.2s, width 0.2s;
+            flex-shrink: 0;
+        `;
+
+        handle.onmouseover = () => {
+            handle.style.background = "#ff9000";
+            handle.style.width      = "60px";
+        };
+        handle.onmouseout = () => {
+            handle.style.background = isCollapsed ? "#ff9000" : "#555";
+            handle.style.width      = "48px";
+        };
+        handle.onclick = () => {
+            isCollapsed = !isCollapsed;
+            if (isCollapsed) {
+                menu.style.transform     = `translateY(calc(100% + 4px))`;
+                menu.style.opacity       = "0";
+                menu.style.pointerEvents = "none";
+                handle.style.background  = "#ff9000";
+            } else {
+                menu.style.transform     = "translateY(0)";
+                menu.style.opacity       = "0.5";
+                menu.style.pointerEvents = "auto";
+                handle.style.background  = "#555";
+            }
+        };
+
+        // Wake up panel on hover (only when expanded)
         menu.onmouseover = () => {
+            if (isCollapsed) return;
             menu.style.opacity     = "1";
-            menu.style.bottom      = "10px";
             menu.style.borderColor = "#666";
         };
         menu.onmouseout = () => {
+            if (isCollapsed) return;
             menu.style.opacity     = "0.5";
-            menu.style.bottom      = "6px";
             menu.style.borderColor = "#444";
         };
 
@@ -429,7 +479,11 @@ app.registerExtension({
         allBtns.push(btnPlus);
 
         updateIndicator();
-        document.body.appendChild(menu);
-        applySize(); // apply initial size after DOM insert
+
+        // Build: wrapper → menu (panel) + handle (thin line, always visible)
+        wrapper.appendChild(menu);
+        wrapper.appendChild(handle);
+        document.body.appendChild(wrapper);
+        applySize();
     }
 });
