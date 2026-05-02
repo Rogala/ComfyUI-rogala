@@ -9,22 +9,55 @@ cd ComfyUI/custom_nodes
 git clone https://github.com/rogala/ComfyUI-rogala
 ```
 
+```ComfyUI-Manager
+You can also install my mods via ComfyUI-Manager—just search for “rogala”
+```
+
 Restart ComfyUI. All nodes appear under the **rogala** menu.
 
 ## Project structure
 
 ```
 ComfyUI-rogala/
-├── __init__.py          # Entry point — registers all nodes
-├── pyproject.toml       # Package metadata
-├── fonts/               # Fonts used by text overlay nodes
-│   └── *.ttf            # Place any TTF font file here
-├── nodes/               # One .py file per node (or logical group)
-│   └── _template.py     # Copy this to create a new node
-├── js/                  # Frontend extensions loaded by ComfyUI
-├── config/              # JSON configuration files
-│   └── categories.json  # Category definitions
-└── web/                 # Static web assets (CSS, icons) if needed
+├── __init__.py                        # Entry point — registers nodes + API routes
+├── pyproject.toml                     # Package metadata
+├── node_list.json                     # Node list for ComfyUI Registry
+├── README.md                          # User-facing documentation
+├── CONTRIBUTING.md                    # This file
+├── LICENSE
+├── fonts/
+│   ├── DejaVuSans.ttf                 # Default font for all nodes
+│   ├── DejaVuSans-Bold.ttf            # Bold variant
+│   ├── DejaVuSansMono.ttf             # Monospaced — ideal for numeric overlays
+│   └── DejaVuSansMono-Bold.ttf        # Monospaced bold variant
+├── nodes/
+│   ├── _template.py                   # Copy this to create a new node
+│   ├── sampler_scheduler_iterator.py
+│   ├── aligned_text_overlay_images.py
+│   ├── aligned_text_overlay_video.py
+│   ├── ltx_resolution_selector.py
+│   ├── fmlf_ltx.py
+│   ├── sampler_ltxv.py
+│   └── advanced_style_selector.py
+├── js/
+│   ├── doc_popup.js                   # Shared ? popup — used by ALL nodes
+│   ├── align_the_nodes.js             # Canvas alignment toolbar — always active
+│   ├── sampler_scheduler_counter.js   # Node-specific JS for SamplerSchedulerIterator
+│   └── advanced_style_selector.js     # DOM widget for AdvancedStyleSelector
+├── config/
+│   ├── sampler_scheduler.json         # Reference list (auto-generated, do not edit)
+│   ├── sampler_scheduler_user.json    # User's personal list (edit this)
+│   ├── styles.json                    # All styles — name, category, prompt, negative_prompt, thumbnail
+│   └── favorites_styles.json          # Favorited styles (managed by API, do not edit manually)
+├── thumbnails/
+│   └── styles/                        # Base thumbnails — one .jpg per style entry
+│       ├── anime.jpg
+│       └── ...                        # ~1000+ files, named by style key
+└── workflows/                         # Example workflows in ComfyUI JSON format
+    ├── LTX-2.3-fmlf_ltx-sampler_ltxv-AlignedTextOverlayVideo.json
+    ├── Z-Image-Turbo_AdvancedStyleSelector.json
+    ├── Z-Image-Turbo_AlignedTextOverlayImages.json
+    └── Z-Image-Turbo_SamplerSchedulerIterator.json
 ```
 ---
 
@@ -51,6 +84,12 @@ A custom ComfyUI node for visual style selection with a built-in thumbnail galle
 - **Negative conditioning control** — toggle between encoded negative or ConditioningZeroOut (for Flux, SD3, etc.)
 - **Styles format** — `config/styles.json`, each entry has `name`, `category`, `prompt`, `negative_prompt`, `thumbnail`. Use `{prompt}` in prompt field to insert user text at a specific position.
 - **Installation** — Find the node under **rogala/Prompting → Advanced Style Selector**
+
+## My Styles
+
+- **My Styles** — save your own styles directly from the node. Enter a name in the `Style name` field and click `Save Style` — the current positive and negative prompts are saved to `config/my_styles.json` as a new style in the `My Styles` category.
+- If a style with the same name already exists it will be updated. The category appears first in the list automatically.
+- To add a thumbnail place a `.jpg` file named after your style in `thumbnails/my_style/` and click `Reload Styles`.
 
 ---
 

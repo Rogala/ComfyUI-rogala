@@ -50,9 +50,11 @@ import folder_paths
 _CATEGORY  = "rogala/Prompting"
 _NODE_NAME = "AdvancedStyleSelector"
 
-_CONFIG_DIR   = os.path.join(os.path.dirname(__file__), "..", "config")
-_STYLES_PATH  = os.path.join(_CONFIG_DIR, "styles.json")
-_THUMBS_DIR   = os.path.join(os.path.dirname(__file__), "..", "thumbnails", "styles")
+_CONFIG_DIR     = os.path.join(os.path.dirname(__file__), "..", "config")
+_STYLES_PATH    = os.path.join(_CONFIG_DIR, "styles.json")
+_MY_STYLES_PATH = os.path.join(_CONFIG_DIR, "my_styles.json")
+_THUMBS_DIR     = os.path.join(os.path.dirname(__file__), "..", "thumbnails", "styles")
+MY_STYLES_CAT   = "My Styles"
 
 # ---------------------------------------------------------------------------
 # Description (shown in ? popup)
@@ -114,7 +116,20 @@ Click ⭐ on any thumbnail to add it to Favorites. Favorites are saved to
 `config/favorites_styles.json` and appear as a separate category at the top
 of the category list. Click ⭐ again to remove.
 
-### Model thumbnails (coming soon)
+### My Styles
+
+Save your own styles directly from the node. Enter a name in the `Style name`
+field and click `Save Style` — the current positive and negative prompts are
+saved to `config/my_styles.json` as a new style in the `My Styles` category.
+The category appears first in the list automatically.
+
+Naming rules: letters, digits and underscores only. Spaces and special
+characters are replaced automatically. Example: `my_cinematic` not `my cinematic`.
+
+To add a thumbnail: place a `.jpg` file named after your style in
+`thumbnails/my_style/` and click `Reload Styles`.
+
+### Model thumbnails
 
 Each style has a default thumbnail in `thumbnails/styles/`. You can add
 per-model thumbnails by creating a subfolder named after your model:
@@ -133,9 +148,12 @@ If a style has no thumbnail there, it falls back to the base folder.
 ---
 
 Styles are loaded from `config/styles.json`.
-Thumbnails are loaded from `thumbnails/styles/`.
+Custom styles are saved to `config/my_styles.json`.
 Favorites are saved to `config/favorites_styles.json`.
 Prompts are saved to `output/prompts/` when save_prompt is enabled.
+Thumbnails are loaded from `thumbnails/styles/`.
+Model preset thumbnails from `thumbnails/{model_name}/`.
+Custom style thumbnails from `thumbnails/my_style/`.
 """
 
 # ---------------------------------------------------------------------------
@@ -157,11 +175,18 @@ def _load_styles(path: str) -> list[dict]:
 
 def _get_categories(styles: list[dict]) -> list[str]:
     seen = []
+    has_my = False
     for s in styles:
         c = s.get("category", "Other")
+        if c == MY_STYLES_CAT:
+            has_my = True
+            continue
         if c not in seen:
             seen.append(c)
-    return sorted(seen)
+    result = sorted(seen)
+    if has_my:
+        result = [MY_STYLES_CAT] + result
+    return result
 
 
 def _styles_in_categories(styles: list[dict], categories: list[str]) -> list[dict]:
@@ -295,22 +320,37 @@ _iter_index: int       = 0
 _iter_reset: bool      = False
 
 
+def _load_my_styles() -> list[dict]:
+    try:
+        with open(_MY_STYLES_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            return data
+        return []
+    except Exception:
+        return []
+
+
 def _ensure_styles():
     global _styles, _styles_path
     if not _styles or _styles_path != _STYLES_PATH:
-        _styles = _load_styles(_STYLES_PATH)
+        base = _load_styles(_STYLES_PATH)
+        my   = _load_my_styles()
+        _styles = base + my
         _styles_path = _STYLES_PATH
-        print(f"[AdvancedStyleSelector] Loaded {len(_styles)} styles.")
+        print(f"[AdvancedStyleSelector] Loaded {len(base)} styles + {len(my)} my styles.")
 
 
 def reload_styles():
     """Called by API route to hot-reload styles."""
     global _styles, _styles_path, _iter_index, _iter_reset
-    _styles = _load_styles(_STYLES_PATH)
+    base = _load_styles(_STYLES_PATH)
+    my   = _load_my_styles()
+    _styles = base + my
     _styles_path = _STYLES_PATH
     _iter_index = 0
     _iter_reset = True
-    print(f"[AdvancedStyleSelector] Reloaded {len(_styles)} styles.")
+    print(f"[AdvancedStyleSelector] Reloaded {len(base)} styles + {len(my)} my styles.")
 
 # ---------------------------------------------------------------------------
 # Node class

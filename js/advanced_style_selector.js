@@ -43,9 +43,12 @@ const CSS = `
   align-items: center;
   gap: 6px;
   padding: 6px;
+  min-height: 38px;
+  height: 38px;
   border-bottom: 1px solid var(--border-color, #2d4a38);
   border-radius: 6px 6px 0 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 .rg-model-sel {
   background: var(--comfy-input-bg, #1a2820);
@@ -501,6 +504,7 @@ class StylePanel {
         // Keep only the default option, add presets after
         while (this._elModel.options.length > 1) this._elModel.remove(1);
         for (const p of presets) {
+          if (p === 'my_style') continue;
           const o = document.createElement('option');
           o.value = p; o.textContent = p;
           this._elModel.appendChild(o);
@@ -516,9 +520,14 @@ class StylePanel {
         }
       }
 
-      // Build categories list — Favorites first if non-empty, then alphabetical
-      const cats = [...new Set(this.styles.map(s => s.category || "Other"))].sort();
-      this.categories = this.favorites.size > 0 ? [FAVORITES_CAT, ...cats] : cats;
+      // Build categories list — My Styles first, Favorites second (if non-empty), then alphabetical
+      const allCats = [...new Set(this.styles.map(s => s.category || "Other"))];
+      const hasMyStyles = allCats.includes("My Styles");
+      const regularCats = allCats.filter(c => c !== "My Styles").sort();
+      let cats = regularCats;
+      if (this.favorites.size > 0) cats = [FAVORITES_CAT, ...cats];
+      if (hasMyStyles) cats = ["My Styles", ...cats];
+      this.categories = cats;
 
       this.loaded = true;
       this._syncFromWidgets();
@@ -566,6 +575,40 @@ class StylePanel {
   remove(i) { this.selected.splice(i, 1); this._syncToWidgets(); this._renderStrip(); this._renderGrid(); }
   clear()   { this.selected = []; this._syncToWidgets(); this._renderStrip(); this._renderGrid(); }
 
+  async _saveMyStyle() {
+    const name = this._elStyleName?.value?.trim();
+    if (!name) { alert("Please enter a style name."); return; }
+    const positive = this._w("positive_text")?.value || "";
+    const negative = this._w("negative_text")?.value || "";
+    if (!positive) { alert("Positive prompt is empty."); return; }
+    try {
+      this._elSaveStyle.textContent = "Saving...";
+      this._elSaveStyle.disabled = true;
+      const res = await fetch("/rogala/my_styles/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, positive, negative }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      // Update field with sanitized name returned from server
+      if (data.name) this._elStyleName.value = data.name;
+      this._elSaveStyle.textContent = data.updated ? "Updated ✓" : "Saved ✓";
+      this._thumbTimestamp = Date.now();
+      await this.reload();
+      setTimeout(() => {
+        this._elSaveStyle.textContent = "Save Style";
+        this._elSaveStyle.disabled = false;
+        this._elStyleName.value = "";
+      }, 2000);
+    } catch(e) {
+      console.error("[StylePanel] saveMyStyle failed:", e);
+      this._elSaveStyle.textContent = "Error ✗";
+      this._elSaveStyle.disabled = false;
+      setTimeout(() => { this._elSaveStyle.textContent = "Save Style"; }, 2000);
+    }
+  }
+
   async toggleFavorite(style, starEl) {
     const key = this._key(style);
     try {
@@ -581,9 +624,14 @@ class StylePanel {
       starEl.textContent = this.favorites.has(key) ? "⭐" : "☆";
       starEl.classList.toggle("active", this.favorites.has(key));
 
-      // Rebuild categories (Favorites might appear/disappear)
-      const cats = [...new Set(this.styles.map(s => s.category || "Other"))].sort();
-      this.categories = this.favorites.size > 0 ? [FAVORITES_CAT, ...cats] : cats;
+      // Rebuild categories
+      const allCats2 = [...new Set(this.styles.map(s => s.category || "Other"))];
+      const hasMyStyles2 = allCats2.includes("My Styles");
+      const regularCats2 = allCats2.filter(c => c !== "My Styles").sort();
+      let cats2 = regularCats2;
+      if (this.favorites.size > 0) cats2 = [FAVORITES_CAT, ...cats2];
+      if (hasMyStyles2) cats2 = ["My Styles", ...cats2];
+      this.categories = cats2;
       this._renderCats();
 	  hidePopup();
       this._filter();
@@ -617,9 +665,11 @@ class StylePanel {
     // Model preset dropdown — populated from thumbnails/styles subfolders via API
     this._elModel = document.createElement('select');
     this._elModel.className = 'rg-model-sel';
-    this._elModel.title = "Select model thumbnail preset. Folders must be named with letters, digits and underscores only (e.g. FLUX_1, SDXL_base). Create a subfolder in thumbnails/styles/ with your model name and place style thumbnails there.";
+    this._elModel.style.flex = '1 1 80px';
+    this._elModel.style.minWidth = '80px';
+    this._elModel.title = "Select model thumbnail preset. Folders must be named with letters, digits and underscores only (e.g. FLUX_1, SDXL_base). Create a subfolder in thumbnails/ with your model name and place style thumbnails there.";
     const _defaultOpt = document.createElement('option');
-    _defaultOpt.value = ''; _defaultOpt.textContent = 'Default thumbnails (base SDXL 1.0)';
+    _defaultOpt.value = ''; _defaultOpt.textContent = 'Default (SDXL 1.0)';
     this._elModel.appendChild(_defaultOpt);
     this._elModel.addEventListener('change', () => {
       const w = this._w('thumbnail_preset');
@@ -637,6 +687,33 @@ class StylePanel {
       await this.reload();
     });
     toolbar.appendChild(this._elReload);
+
+    // Style name input — for saving custom styles
+    this._elStyleName = document.createElement('input');
+    this._elStyleName.type = 'text';
+    this._elStyleName.className = 'rg-model-sel';
+    this._elStyleName.placeholder = 'Style name...';
+    this._elStyleName.title = 'Style name: letters, digits and underscores only. Spaces and special characters are replaced automatically.';
+    this._elStyleName.style.flex = '1 1 80px';
+    this._elStyleName.style.minWidth = '80px';
+    // Auto-sanitize: spaces → underscore, remove invalid chars
+    this._elStyleName.addEventListener('input', e => {
+      const pos = e.target.selectionStart;
+      const clean = e.target.value.replace(/\s+/g, '_').replace(/[^\w]/g, '');
+      if (clean !== e.target.value) {
+        e.target.value = clean;
+        e.target.setSelectionRange(pos, pos);
+      }
+    });
+    toolbar.appendChild(this._elStyleName);
+
+    // Save Style button
+    this._elSaveStyle = document.createElement('button');
+    this._elSaveStyle.className = 'rg-reload-btn';
+    this._elSaveStyle.textContent = 'Save Style';
+    this._elSaveStyle.title = 'Save current positive/negative prompts as a custom style to my_styles.json';
+    this._elSaveStyle.addEventListener('click', () => this._saveMyStyle());
+    toolbar.appendChild(this._elSaveStyle);
 
     panel.appendChild(toolbar);
 
@@ -797,11 +874,19 @@ class StylePanel {
         if (s.thumbnail) {
           const fn = s.thumbnail.split(/[\\/]/).pop();
           const model = this._elModel?.value || '';
-          const base = model ? `/rogala/thumbnails/${model}/${fn}` : `/rogala/thumbnails/styles/${fn}`;
+          const isMyStyle = s.category === "My Styles";
+          const base = isMyStyle
+            ? `/rogala/thumbnails/my_style/${fn}`
+            : model ? `/rogala/thumbnails/${model}/${fn}` : `/rogala/thumbnails/styles/${fn}`;
           const imgEl = document.createElement("img");
           imgEl.src = `${base}?t=${this._thumbTimestamp}`;
           imgEl.onerror = () => {
-            if (model) { imgEl.onerror = null; imgEl.src = `/rogala/thumbnails/styles/${fn}?t=${this._thumbTimestamp}`; }
+            imgEl.onerror = null;
+            imgEl.style.display = "none";
+            if (!isMyStyle && model) {
+              imgEl.src = `/rogala/thumbnails/styles/${fn}?t=${this._thumbTimestamp}`;
+              imgEl.style.display = "";
+            }
           };
           img.appendChild(imgEl);
         } else {
@@ -858,17 +943,24 @@ class StylePanel {
       const fn  = style.thumbnail.split(/[\\/]/).pop();
       const img = document.createElement("img");
       const model = this._elModel?.value || '';
-      const base = model ? `/rogala/thumbnails/${model}/${fn}` : `/rogala/thumbnails/styles/${fn}`;
+      const isMyStyle = style.category === "My Styles";
+      const base = isMyStyle
+        ? `/rogala/thumbnails/my_style/${fn}`
+        : model ? `/rogala/thumbnails/${model}/${fn}` : `/rogala/thumbnails/styles/${fn}`;
       img.src = `${base}?t=${this._thumbTimestamp}`;
       img.style.display = "none";
       img.onload  = () => { img.style.display = ""; init2.style.display = "none"; };
       // fallback to base folder if model-specific thumbnail not found
       img.onerror = () => {
-        if (model) {
+        if (!isMyStyle && model) {
           img.onerror = null;
           img.src = `/rogala/thumbnails/styles/${fn}?t=${this._thumbTimestamp}`;
           img.style.display = "";
           init2.style.display = "none";
+        } else {
+          img.src = "";
+          img.onerror = null;
+          img.style.display = "none";
         }
       };
       imgBox.appendChild(img);
@@ -961,6 +1053,7 @@ class StylePanel {
   }
   async reload() {
     this.loaded = false;
+    this._thumbTimestamp = Date.now();
     this._elGrid.textContent = "Reloading…";
     await this._load();
   }

@@ -18,6 +18,8 @@ import os as _os
 import json as _json
 
 _FAVORITES_PATH = _os.path.join(_os.path.dirname(__file__), "config", "favorites_styles.json")
+_MY_STYLES_PATH = _os.path.join(_os.path.dirname(__file__), "config", "my_styles.json")
+_MY_THUMBS_DIR  = _os.path.join(_os.path.dirname(__file__), "thumbnails", "my_style")
 
 def _load_favorites() -> list:
     try:
@@ -33,6 +35,15 @@ def _save_favorites(favs: list) -> None:
 # Auto-create favorites file if missing
 if not _os.path.isfile(_FAVORITES_PATH):
     _save_favorites([])
+
+# Auto-create my_styles.json if missing
+if not _os.path.isfile(_MY_STYLES_PATH):
+    with open(_MY_STYLES_PATH, "w", encoding="utf-8") as _f:
+        _json.dump([], _f, ensure_ascii=False, indent=2)
+
+# Auto-create my_style thumbnails folder if missing
+if not _os.path.isdir(_MY_THUMBS_DIR):
+    _os.makedirs(_MY_THUMBS_DIR, exist_ok=True)
 
 NODE_CLASS_MAPPINGS: dict = {
     **_SAMPLER_NODES,
@@ -101,9 +112,12 @@ try:
         from .nodes.advanced_style_selector import _THUMBS_DIR
         model    = os.path.basename(request.match_info["model"])
         filename = os.path.basename(request.match_info["filename"])
-        # Model folders sit next to the base "styles" folder, not inside it
-        thumbs_parent = os.path.dirname(_THUMBS_DIR)
-        path = os.path.join(thumbs_parent, model, filename)
+        # my_style folder uses its own directory
+        if model == "my_style":
+            path = os.path.join(_MY_THUMBS_DIR, filename)
+        else:
+            thumbs_parent = os.path.dirname(_THUMBS_DIR)
+            path = os.path.join(thumbs_parent, model, filename)
         if os.path.isfile(path):
             return web.FileResponse(path, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
         return web.Response(status=404)
@@ -116,11 +130,57 @@ try:
             thumbs_parent = os.path.dirname(_THUMBS_DIR)
             presets = sorted([
                 d for d in os.listdir(thumbs_parent)
-                if os.path.isdir(os.path.join(thumbs_parent, d)) and d != "styles"
+                if os.path.isdir(os.path.join(thumbs_parent, d))
+                and d not in ("styles", "my_style")
             ])
             return web.json_response({"presets": presets})
         except Exception as e:
             return web.json_response({"presets": [], "error": str(e)})
+
+    @PromptServer.instance.routes.post("/rogala/my_styles/save")
+    async def _save_my_style(request):
+        import os, re
+        try:
+            data = await request.json()
+            name     = data.get("name", "").strip()
+            positive = data.get("positive", "").strip()
+            negative = data.get("negative", "").strip()
+            if not name:
+                return web.json_response({"error": "name is required"}, status=400)
+            # Sanitize: spaces → underscore, keep only letters/digits/underscores
+            safe_name = re.sub(r'\s+', '_', name)
+            safe_name = re.sub(r'[^\w]', '', safe_name)
+            safe_name = re.sub(r'_+', '_', safe_name).strip('_')
+            if not safe_name:
+                return web.json_response({"error": "name contains no valid characters"}, status=400)
+            new_style = {
+                "category": "My Styles",
+                "name": safe_name,
+                "prompt": positive,
+                "negative_prompt": negative,
+                "thumbnail": f"thumbnails/my_style/{safe_name}.jpg",
+            }
+            try:
+                with open(_MY_STYLES_PATH, "r", encoding="utf-8") as f:
+                    styles = _json.load(f)
+                if not isinstance(styles, list):
+                    styles = []
+            except Exception:
+                styles = []
+            updated = False
+            for i, s in enumerate(styles):
+                if s.get("name") == safe_name:
+                    styles[i] = new_style
+                    updated = True
+                    break
+            if not updated:
+                styles.append(new_style)
+            with open(_MY_STYLES_PATH, "w", encoding="utf-8") as f:
+                _json.dump(styles, f, ensure_ascii=False, indent=2)
+            reload_styles()
+            return web.json_response({"status": "ok", "updated": updated, "name": safe_name})
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
 
     @PromptServer.instance.routes.get("/rogala/favorites")
     async def _get_favorites(request):
