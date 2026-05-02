@@ -90,7 +90,7 @@ A custom ComfyUI node for visual style selection with a built-in thumbnail galle
 - **My Styles** — save your own styles directly from the node. Enter a name in the `Style name` field and click `Save Style` — the current positive and negative prompts are saved to `config/my_styles.json` as a new style in the `My Styles` category.
 - If a style with the same name already exists it will be updated. The category appears first in the list automatically.
 - To add a thumbnail place a `.jpg` file named after your style in `thumbnails/my_style/` and click `Reload Styles`.
-- After updating the version via ComfyUI Manager, the my_styles.json file and the .\thumbnails\my_style\ folder are not deleted or modified.
+- After updating the version via ComfyUI Manager, the my_styles.json file and the ./thumbnails/my_style/ folder are not deleted or modified.
 
 ---
 
